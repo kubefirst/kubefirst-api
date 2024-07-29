@@ -29,10 +29,10 @@ func CreateTokensFromDatabaseRecord(cl *pkgtypes.Cluster, registryPath string, s
 		fullDomainName = cl.DomainName
 	}
 
-	destinationGitopsRepoURL := fmt.Sprintf("https://%s/%s/gitops.git", cl.GitHost, cl.GitAuth.Owner)
+	destinationGitopsRepoURL := fmt.Sprintf("https://%s/%s/%s.git", cl.GitHost, cl.GitAuth.Owner, cl.GitopsRepoName)
 
 	if cl.GitProtocol == "ssh" {
-		destinationGitopsRepoURL = fmt.Sprintf("git@%s:%s/gitops.git", cl.GitHost, cl.GitAuth.Owner)
+		destinationGitopsRepoURL = fmt.Sprintf("git@%s:%s/%s.git", cl.GitHost, cl.GitAuth.Owner, cl.GitopsRepoName)
 	}
 
 	var externalDNSProviderTokenEnvName, externalDNSProviderSecretKey string
@@ -111,7 +111,7 @@ func CreateTokensFromDatabaseRecord(cl *pkgtypes.Cluster, registryPath string, s
 		GitURL:               cl.GitopsTemplateURL,
 		GitopsRepoURL:        destinationGitopsRepoURL,
 
-		GitHubHost:  fmt.Sprintf("https://github.com/%s/gitops.git", cl.GitAuth.Owner),
+		GitHubHost:  fmt.Sprintf("https://github.com/%s/%s.git", cl.GitAuth.Owner, cl.GitopsRepoName),
 		GitHubOwner: cl.GitAuth.Owner,
 		GitHubUser:  cl.GitAuth.User,
 
@@ -121,9 +121,9 @@ func CreateTokensFromDatabaseRecord(cl *pkgtypes.Cluster, registryPath string, s
 		GitlabUser:         cl.GitAuth.User,
 
 		GitopsRepoAtlantisWebhookURL:               cl.AtlantisWebhookURL,
-		GitopsRepoNoHTTPSURL:                       fmt.Sprintf("%s/%s/gitops.git", cl.GitHost, cl.GitAuth.Owner),
-		WorkloadClusterTerraformModuleURL:          fmt.Sprintf("git::https://%s/%s/gitops.git//terraform/%s/modules/workload-cluster?ref=main", cl.GitHost, cl.GitAuth.Owner, cl.CloudProvider),
-		WorkloadClusterBootstrapTerraformModuleURL: fmt.Sprintf("git::https://%s/%s/gitops.git//terraform/%s/modules/bootstrap?ref=main", cl.GitHost, cl.GitAuth.Owner, cl.CloudProvider),
+		GitopsRepoNoHTTPSURL:                       fmt.Sprintf("%s/%s/%s.git", cl.GitHost, cl.GitAuth.Owner, cl.GitopsRepoName),
+		WorkloadClusterTerraformModuleURL:          fmt.Sprintf("git::https://%s/%s/%s.git//terraform/%s/modules/workload-cluster?ref=main", cl.GitHost, cl.GitAuth.Owner, cl.GitopsRepoName, cl.CloudProvider),
+		WorkloadClusterBootstrapTerraformModuleURL: fmt.Sprintf("git::https://%s/%s/%s.git//terraform/%s/modules/bootstrap?ref=main", cl.GitHost, cl.GitAuth.Owner, cl.GitopsRepoName, cl.CloudProvider),
 		ClusterId: cl.ClusterID,
 
 		// external-dns optionality to provide cloudflare support regardless of cloud provider

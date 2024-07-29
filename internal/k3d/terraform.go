@@ -7,6 +7,10 @@ See the LICENSE file for more details.
 package k3d
 
 import (
+	"os"
+	"io/ioutil"
+	"strings"
+	"path/filepath"
 	pkg "github.com/kubefirst/kubefirst-api/internal"
 )
 
@@ -52,4 +56,48 @@ type GithubTerraformEnvs struct {
 	KbotSSHPublicKey      string
 	AwsAccessKeyId        string
 	AwsSecretAccessKey    string
+}
+
+
+func TerraformPrep(config *K3dConfig) error{
+
+	path := config.GitopsDir + "/terraform"
+	err := filepath.Walk(path,detokenizeterraform(path,config))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func detokenizeterraform(path string,config *K3dConfig) filepath.WalkFunc {
+	return filepath.WalkFunc(func(path string,fi os.FileInfo,err error) error{
+
+		if fi.IsDir()  {
+			return nil
+		}
+
+		matched,_ := filepath.Match("*",fi.Name())
+
+		if matched {
+
+			read,err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			newContents := string(read)
+			newContents = strings.Replace(newContents,"<ADMIN-TEAM>",config.AdminTeamName,-1)
+			newContents = strings.Replace(newContents,"<DEVELOPER-TEAM>",config.DeveloperTeamName,-1)
+			newContents = strings.Replace(newContents,"<METPAHOR-REPO-NAME>",config.MetaphorRepoName,-1)
+			newContents = strings.Replace(newContents,"<GIT-REPO-NAME>",config.GitopsRepoName,-1)
+
+			err = ioutil.WriteFile(path,[]byte(newContents),0)
+			if err != nil {
+				return err
+			}
+			
+		}
+		return nil
+	})
+
 }

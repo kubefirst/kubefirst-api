@@ -35,7 +35,7 @@ func DeleteAkamaiCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.Telemetr
 	telemetry.SendEvent(telemetryEvent, telemetry.ClusterDeleteStarted, "")
 
 	// Instantiate civo config
-	config := providerConfigs.GetConfig(cl.ClusterName, cl.DomainName, cl.GitProvider, cl.GitAuth.Owner, cl.GitProtocol, cl.CloudflareAuth.APIToken, cl.CloudflareAuth.OriginCaIssuerKey)
+	config := providerConfigs.GetConfig(cl.ClusterName, cl.DomainName, cl.GitProvider, cl.GitAuth.Owner, cl.GitProtocol, cl.CloudflareAuth.APIToken, cl.CloudflareAuth.OriginCaIssuerKey,cl.GitopsRepoName,cl.MetaphorRepoName)
 
 	kcfg := utils.GetKubernetesClient(cl.ClusterName)
 
@@ -250,7 +250,7 @@ func DeleteAkamaiCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.Telemetr
 		return err
 	}
 
-	err = pkg.ResetK1Dir(config.K1Dir)
+	err = pkg.ResetK1Dir(config.K1Dir, cl.GitopsRepoName, cl.MetaphorRepoName)
 	if err != nil {
 		return err
 	}

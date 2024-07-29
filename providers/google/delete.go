@@ -35,7 +35,7 @@ import (
 func DeleteGoogleCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEvent) error {
 
 	// Instantiate google config
-	config := providerConfigs.GetConfig(cl.ClusterName, cl.DomainName, cl.GitProvider, cl.GitAuth.Owner, cl.GitProtocol, cl.CloudflareAuth.Token, "")
+	config := providerConfigs.GetConfig(cl.ClusterName, cl.DomainName, cl.GitProvider, cl.GitAuth.Owner, cl.GitProtocol, cl.CloudflareAuth.Token, "",cl.GitopsRepoName,cl.MetaphorRepoName)
 
 	kcfg := utils.GetKubernetesClient(cl.ClusterName)
 
@@ -253,7 +253,7 @@ func DeleteGoogleCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.Telemetr
 		return err
 	}
 
-	err = pkg.ResetK1Dir(config.K1Dir)
+	err = pkg.ResetK1Dir(config.K1Dir, cl.GitopsRepoName, cl.MetaphorRepoName)
 	if err != nil {
 		return err
 	}

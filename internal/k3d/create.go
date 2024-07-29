@@ -119,8 +119,10 @@ func PrepareGitRepositories(
 	metaphorTokens *MetaphorTokenValues,
 	gitProtocol string,
 	removeAtlantis bool,
+	gitopsRepoName string,
+	metaphorRepoName string,
 ) error {
-
+	log.Info().Msg("hekeei")
 	//* clone the gitops-template repo
 	gitopsRepo, err := gitClient.CloneRefSetMain(gitopsTemplateBranch, gitopsDir, gitopsTemplateURL)
 	if err != nil {
@@ -149,7 +151,8 @@ func PrepareGitRepositories(
 
 	// ! metaphor
 	// * adjust the content for the gitops repo
-	err = AdjustMetaphorRepo(DestinationMetaphorRepoURL, gitopsDir, gitProvider, k1Dir)
+
+	err = AdjustMetaphorRepo(DestinationMetaphorRepoURL, gitopsDir, gitProvider, gitopsRepoName, metaphorRepoName,k1Dir)
 	if err != nil {
 		return err
 	}

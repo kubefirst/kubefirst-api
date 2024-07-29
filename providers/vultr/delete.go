@@ -36,7 +36,7 @@ func DeleteVultrCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.Telemetry
 	telemetry.SendEvent(telemetryEvent, telemetry.ClusterDeleteStarted, "")
 
 	// Instantiate vultr config
-	config := providerConfigs.GetConfig(cl.ClusterName, cl.DomainName, cl.GitProvider, cl.GitAuth.Owner, cl.GitProtocol, cl.CloudflareAuth.Token, "")
+	config := providerConfigs.GetConfig(cl.ClusterName, cl.DomainName, cl.GitProvider, cl.GitAuth.Owner, cl.GitProtocol, cl.CloudflareAuth.Token, "",cl.GitopsRepoName,cl.MetaphorRepoName)
 
 	kcfg := utils.GetKubernetesClient(cl.ClusterName)
 
@@ -281,7 +281,7 @@ func DeleteVultrCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.Telemetry
 		return err
 	}
 
-	err = runtime.ResetK1Dir(config.K1Dir)
+	err = runtime.ResetK1Dir(config.K1Dir, cl.GitopsRepoName, cl.MetaphorRepoName)
 	if err != nil {
 		return err
 	}

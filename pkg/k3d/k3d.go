@@ -29,3 +29,4 @@ var DeleteK3dCluster = internal.DeleteK3dCluster
 var GenerateSingleTLSSecret = internal.GenerateSingleTLSSecret
 
 var ClusterCreateConsoleAPI = internal.ClusterCreateConsoleAPI
+var TerraformPrep = internal.TerraformPrep

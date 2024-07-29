@@ -72,6 +72,11 @@ type GitopsDirectoryValues struct {
 	GitRunnerDescription string
 	GitRunnerNS          string
 	GitURL               string
+	AdminTeamName		 string
+	DeveloperTeamName	 string
+	MetaphorRepoName	 string
+	GitopsRepoName		 string
+
 
 	GitHubHost  string
 	GitHubOwner string
@@ -105,4 +110,5 @@ type MetaphorTokenValues struct {
 	MetaphorDevelopmentIngressURL string
 	MetaphorProductionIngressURL  string
 	MetaphorStagingIngressURL     string
+	MetaphorRepoName			  string
 }

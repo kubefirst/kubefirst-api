@@ -20,4 +20,6 @@ tmp
 launch.json
 __debug_*
 .env
+tmp
+/log
 

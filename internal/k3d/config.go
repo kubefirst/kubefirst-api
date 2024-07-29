@@ -66,10 +66,14 @@ type K3dConfig struct {
 	MkCertSSLSecretDir              string
 	TerraformClient                 string
 	ToolsDir                        string
+	GitopsRepoName					string
+	MetaphorRepoName				string
+	AdminTeamName					string
+	DeveloperTeamName				string
 }
 
 // GetConfig - load default values from kubefirst installer
-func GetConfig(clusterName string, gitProvider string, gitOwner string, gitProtocol string) *K3dConfig {
+func GetConfig(clusterName string, gitProvider string, gitOwner string, gitProtocol string,gitopsRepoName string,metaphorRepoName string,adminTeamName string,developerTeamName string) *K3dConfig {
 	config := K3dConfig{}
 
 	if err := env.Parse(&config); err != nil {
@@ -90,12 +94,15 @@ func GetConfig(clusterName string, gitProvider string, gitOwner string, gitProto
 		cGitHost = GitlabHost
 	}
 
-	config.DestinationGitopsRepoURL = fmt.Sprintf("https://%s/%s/gitops.git", cGitHost, gitOwner)
-	config.DestinationGitopsRepoGitURL = fmt.Sprintf("git@%s:%s/gitops.git", cGitHost, gitOwner)
-	config.DestinationMetaphorRepoURL = fmt.Sprintf("https://%s/%s/metaphor.git", cGitHost, gitOwner)
-	config.DestinationMetaphorRepoGitURL = fmt.Sprintf("git@%s:%s/metaphor.git", cGitHost, gitOwner)
-
-	config.GitopsDir = fmt.Sprintf("%s/.k1/%s/gitops", homeDir, clusterName)
+	config.DestinationGitopsRepoURL = fmt.Sprintf("https://%s/%s/%s.git", cGitHost, gitOwner, gitopsRepoName)
+	config.DestinationGitopsRepoGitURL = fmt.Sprintf("git@%s:%s/%s.git", cGitHost, gitOwner, gitopsRepoName)
+	config.DestinationMetaphorRepoURL = fmt.Sprintf("https://%s/%s/%s.git", cGitHost, gitOwner, metaphorRepoName)
+	config.DestinationMetaphorRepoGitURL = fmt.Sprintf("git@%s:%s/%s.git", cGitHost, gitOwner, metaphorRepoName)
+	config.GitopsRepoName = gitopsRepoName
+	config.MetaphorRepoName = metaphorRepoName
+	config.AdminTeamName = adminTeamName
+	config.DeveloperTeamName = developerTeamName
+	config.GitopsDir = fmt.Sprintf("%s/.k1/%s/%s", homeDir, clusterName, gitopsRepoName)
 	config.GitProvider = gitProvider
 	config.GitProtocol = gitProtocol
 	config.K1Dir = fmt.Sprintf("%s/.k1/%s", homeDir, clusterName)
@@ -103,7 +110,7 @@ func GetConfig(clusterName string, gitProvider string, gitOwner string, gitProto
 	config.KubectlClient = fmt.Sprintf("%s/.k1/%s/tools/kubectl", homeDir, clusterName)
 	config.Kubeconfig = fmt.Sprintf("%s/.k1/%s/kubeconfig", homeDir, clusterName)
 	config.KubefirstConfig = fmt.Sprintf("%s/.k1/%s/%s", homeDir, clusterName, ".kubefirst")
-	config.MetaphorDir = fmt.Sprintf("%s/.k1/%s/metaphor", homeDir, clusterName)
+	config.MetaphorDir = fmt.Sprintf("%s/.k1/%s/%s", homeDir, clusterName, metaphorRepoName)
 	config.MkCertClient = fmt.Sprintf("%s/.k1/%s/tools/mkcert", homeDir, clusterName)
 	config.MkCertPemDir = fmt.Sprintf("%s/.k1/%s/ssl/%s/pem", homeDir, clusterName, DomainName)
 	config.MkCertSSLSecretDir = fmt.Sprintf("%s/.k1/%s/ssl/%s/secrets", homeDir, clusterName, DomainName)
@@ -112,6 +119,8 @@ func GetConfig(clusterName string, gitProvider string, gitOwner string, gitProto
 
 	return &config
 }
+
+
 
 type GitopsDirectoryValues struct {
 	GithubOwner                   string

@@ -148,6 +148,10 @@ func detokenizeGitops(path string, tokens *GitopsDirectoryValues, gitProtocol st
 				newContents = strings.Replace(newContents, "<GIT_RUNNER_DESCRIPTION>", tokens.GitRunnerDescription, -1)
 				newContents = strings.Replace(newContents, "<GIT_RUNNER_NS>", tokens.GitRunnerNS, -1)
 				newContents = strings.Replace(newContents, "<GIT_URL>", tokens.GitURL, -1) // remove
+				newContents = strings.Replace(newContents, "<ADMIN-TEAM>",tokens.AdminTeamName,-1)
+				newContents = strings.Replace(newContents, "<DEVELOPER-TEAM>",tokens.DeveloperTeamName,-1)
+				newContents = strings.Replace(newContents, "<METPAHOR-REPO-NAME>",tokens.MetaphorRepoName,-1)
+				newContents = strings.Replace(newContents, "<GIT-REPO-NAME>",tokens.GitopsRepoName,-1)
 
 				// GitHub
 				newContents = strings.Replace(newContents, "<GITHUB_HOST>", tokens.GitHubHost, -1)

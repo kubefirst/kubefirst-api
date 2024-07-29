@@ -53,8 +53,13 @@ func (c *CloudflareConfiguration) TestDomainLiveness(domainName string) bool {
 	RecordName := "kubefirst-liveness." + domainName
 	RecordValue := "domain record propagated"
 
+	fmt.Printf("Doamin Name is %s\n",domainName)
+
 	// Get zone id for domain name
 	zoneId, err := c.Client.ZoneIDByName(domainName)
+
+	zoneId, err = c.Client.ZoneIDByName(domainName)
+	fmt.Println(err)
 	if err != nil {
 		log.Error().Msgf("error finding cloudflare zoneid for domain %s: %s", domainName, err)
 		return false

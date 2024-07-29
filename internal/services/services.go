@@ -48,7 +48,7 @@ func CreateService(cl *pkgtypes.Cluster, serviceName string, appDef *pkgtypes.Gi
 	}
 
 	homeDir, _ := os.UserHomeDir()
-	tmpGitopsDir := fmt.Sprintf("%s/.k1/%s/%s/gitops", homeDir, cl.ClusterName, serviceName)
+	tmpGitopsDir := fmt.Sprintf("%s/.k1/%s/%s/%s", homeDir, cl.ClusterName, serviceName,cl.GitopsRepoName)
 	tmpGitopsCatalogDir := fmt.Sprintf("%s/.k1/%s/%s/gitops-catalog", homeDir, cl.ClusterName, serviceName)
 
 	// Remove gitops dir
@@ -307,7 +307,7 @@ func DeleteService(cl *pkgtypes.Cluster, serviceName string, def pkgtypes.Gitops
 
 	if !def.SkipFiles {
 		homeDir, _ := os.UserHomeDir()
-		tmpGitopsDir := fmt.Sprintf("%s/.k1/%s/%s/gitops", homeDir, cl.ClusterName, serviceName)
+		tmpGitopsDir := fmt.Sprintf("%s/.k1/%s/%s/%s", homeDir, cl.ClusterName, serviceName,cl.GitopsRepoName)
 
 		// Remove gitops dir
 		err = os.RemoveAll(tmpGitopsDir)
@@ -404,7 +404,7 @@ func ValidateService(cl *pkgtypes.Cluster, serviceName string, def *pkgtypes.Git
 	}
 
 	homeDir, _ := os.UserHomeDir()
-	tmpGitopsDir := fmt.Sprintf("%s/.k1/%s/%s/gitops", homeDir, cl.ClusterName, serviceName)
+	tmpGitopsDir := fmt.Sprintf("%s/.k1/%s/%s/%s", homeDir, cl.ClusterName, serviceName,cl.GitopsRepoName)
 
 	// Remove gitops dir
 	err := os.RemoveAll(tmpGitopsDir)
@@ -469,8 +469,8 @@ func AddDefaultServices(cl *pkgtypes.Cluster) error {
 			Default:     true,
 			Description: "The git repositories contain all the Infrastructure as Code and Gitops configurations.",
 			Image:       fmt.Sprintf("https://assets.kubefirst.com/console/%s.svg", cl.GitProvider),
-			Links: []string{fmt.Sprintf("https://%s/%s/gitops", cl.GitHost, cl.GitAuth.Owner),
-				fmt.Sprintf("https://%s/%s/metaphor", cl.GitHost, cl.GitAuth.Owner)},
+			Links: []string{fmt.Sprintf("https://%s/%s/%s", cl.GitHost, cl.GitAuth.Owner,cl.GitopsRepoName),
+				fmt.Sprintf("https://%s/%s/%s", cl.GitHost, cl.GitAuth.Owner, cl.MetaphorRepoName)},
 			Status:    "",
 			CreatedBy: "kbot",
 		},

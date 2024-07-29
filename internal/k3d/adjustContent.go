@@ -93,10 +93,11 @@ func AdjustGitopsRepo(cloudProvider, clusterName, clusterType, gitopsRepoDir, gi
 	return nil
 }
 
-func AdjustMetaphorRepo(destinationMetaphorRepoGitURL, gitopsRepoDir, gitProvider, k1Dir string) error {
+func AdjustMetaphorRepo(destinationMetaphorRepoGitURL, gitopsRepoDir, gitProvider, gitopsRepoName,metaphorRepoName,k1Dir string) error {
 
 	//* create ~/.k1/metaphor
-	metaphorDir := fmt.Sprintf("%s/metaphor", k1Dir)
+	metaphorDir := fmt.Sprintf("%s/%s", k1Dir, metaphorRepoName)
+	log.Info().Msg(metaphorDir)
 	os.Mkdir(metaphorDir, 0700)
 
 	//* git init
@@ -131,7 +132,7 @@ func AdjustMetaphorRepo(destinationMetaphorRepoGitURL, gitopsRepoDir, gitProvide
 	switch gitProvider {
 	case "github":
 		//* copy $HOME/.k1/gitops/ci/.github/* $HOME/.k1/metaphor/.github
-		githubActionsFolderContent := fmt.Sprintf("%s/gitops/ci/.github", k1Dir)
+		githubActionsFolderContent := fmt.Sprintf("%s/%s/ci/.github", k1Dir,gitopsRepoName)
 		log.Info().Msgf("copying github content: %s", githubActionsFolderContent)
 		err := cp.Copy(githubActionsFolderContent, fmt.Sprintf("%s/.github", metaphorDir), opt)
 		if err != nil {
@@ -140,7 +141,7 @@ func AdjustMetaphorRepo(destinationMetaphorRepoGitURL, gitopsRepoDir, gitProvide
 		}
 	case "gitlab":
 		//* copy $HOME/.k1/gitops/ci/.gitlab-ci.yml/* $HOME/.k1/metaphor/.github
-		gitlabCIContent := fmt.Sprintf("%s/gitops/ci/.gitlab-ci.yml", k1Dir)
+		gitlabCIContent := fmt.Sprintf("%s/%s/ci/.gitlab-ci.yml", k1Dir,gitopsRepoName)
 		log.Info().Msgf("copying gitlab content: %s", gitlabCIContent)
 		err := cp.Copy(gitlabCIContent, fmt.Sprintf("%s/.gitlab-ci.yml", metaphorDir), opt)
 		if err != nil {
@@ -150,7 +151,7 @@ func AdjustMetaphorRepo(destinationMetaphorRepoGitURL, gitopsRepoDir, gitProvide
 	}
 
 	//* copy $HOME/.k1/gitops/ci/.argo/* $HOME/.k1/metaphor/.argo
-	argoWorkflowsFolderContent := fmt.Sprintf("%s/gitops/ci/.argo", k1Dir)
+	argoWorkflowsFolderContent := fmt.Sprintf("%s/%s/ci/.argo", k1Dir,gitopsRepoName)
 	log.Info().Msgf("copying argo workflows content: %s", argoWorkflowsFolderContent)
 	err = cp.Copy(argoWorkflowsFolderContent, fmt.Sprintf("%s/.argo", metaphorDir), opt)
 	if err != nil {

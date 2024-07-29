@@ -594,10 +594,11 @@ func AdjustMetaphorRepo(
 	destinationMetaphorRepoURL string,
 	gitopsRepoDir string,
 	gitProvider string,
+	metaphorRepoName,
 	k1Dir string,
 ) error {
 	//* create ~/.k1/metaphor
-	metaphorDir := fmt.Sprintf("%s/metaphor", k1Dir)
+	metaphorDir := fmt.Sprintf("%s/%s", k1Dir, metaphorRepoName)
 	os.Mkdir(metaphorDir, 0700)
 
 	//* git init
@@ -992,7 +993,7 @@ func PrepareGitRepositories(
 
 	// ADJUST CONTENT
 	//* adjust the content for the metaphor repo
-	err = AdjustMetaphorRepo(destinationMetaphorRepoURL, gitopsDir, gitProvider, k1Dir)
+	err = AdjustMetaphorRepo(destinationMetaphorRepoURL, gitopsDir, gitProvider, gitopsTokens.MetaphorRepoName, k1Dir)
 	if err != nil {
 		return err
 	}

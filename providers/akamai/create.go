@@ -74,6 +74,12 @@ func CreateAkamaiCluster(definition *pkgtypes.ClusterDefinition) error {
 		return err
 	}
 
+	err = ctrl.TerraformPrep()
+	if err != nil {
+		ctrl.HandleError(err.Error())
+		return err
+	}
+
 	err = ctrl.RunGitTerraform()
 	if err != nil {
 		ctrl.HandleError(err.Error())
