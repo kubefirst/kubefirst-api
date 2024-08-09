@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/servicequotas"
 )
 
-func (conf *AWSConfiguration) ListQuotas() (*servicequotas.GetServiceQuotaOutput, error) {
+func (conf *Configuration) ListQuotas() (*servicequotas.GetServiceQuotaOutput, error) {
 	quotasClient := servicequotas.NewFromConfig(conf.Config)
 
 	quota, err := quotasClient.GetServiceQuota(context.Background(), &servicequotas.GetServiceQuotaInput{

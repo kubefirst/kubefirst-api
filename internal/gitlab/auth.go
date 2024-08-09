@@ -12,40 +12,33 @@ import (
 	"io"
 	"net/http"
 
-	pkg "github.com/kubefirst/kubefirst-api/internal"
+	"github.com/kubefirst/kubefirst-api/internal"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 	"github.com/rs/zerolog/log"
 )
 
 const (
-	gitlabApiUrl = "https://gitlab.com/api/v4"
-)
-
-var (
-	requiredScopes = []string{
-		"read_api",
-		"read_user",
-		"read_repository",
-		"write_repository",
-		"read_registry",
-		"write_registry",
-	}
+	gitlabAPIURL = "https://gitlab.com/api/v4"
 )
 
 // VerifyTokenPermissions compares scope of the provided token to the required
 // scopes for kubefirst functionality
 func VerifyTokenPermissions(gitlabToken string) error {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/personal_access_tokens/self", gitlabApiUrl), nil)
+	destination := fmt.Sprintf("%s/personal_access_tokens/self", gitlabAPIURL)
+	req, err := http.NewRequest(http.MethodGet, destination, nil)
 	if err != nil {
-		log.Info().Msg("error setting gitlab owner permissions request")
+		log.Error().Msgf("unable to create HTTP request to %q", destination)
+		return fmt.Errorf("unable to create HTTP request to %q", destination)
 	}
+
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", gitlabToken))
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := httpCommon.CustomHTTPClient(false).Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to make GET request to GitLab API %q: %w", req.URL.String(), err)
 	}
-
 	defer res.Body.Close()
+
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return err
@@ -60,33 +53,38 @@ func VerifyTokenPermissions(gitlabToken string) error {
 	}
 
 	// Get token scopes
-	var responseJson interface{}
-	err = json.Unmarshal(body, &responseJson)
-	if err != nil {
-		return err
+	var response struct {
+		Scopes []string `json:"scopes"`
 	}
-	responseJsonMap := responseJson.(map[string]interface{})
-	scopes := responseJsonMap["scopes"].([]interface{})
-	scopesSlice := make([]string, 0)
-	for _, s := range scopes {
-		scopesSlice = append(scopesSlice, string(s.(string)))
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return err
 	}
 
 	// api allows all access so we won't need to check the rest
-	if pkg.FindStringInSlice(scopesSlice, "api") {
+	if internal.FindStringInSlice(response.Scopes, "api") {
 		return nil
+	}
+
+	requiredScopes := [...]string{
+		"read_api",
+		"read_user",
+		"read_repository",
+		"write_repository",
+		"read_registry",
+		"write_registry",
 	}
 
 	// Compare token scopes to required scopes
 	missingScopes := make([]string, 0)
 	for _, ts := range requiredScopes {
-		if !pkg.FindStringInSlice(scopesSlice, ts) {
+		if !internal.FindStringInSlice(response.Scopes, ts) {
 			missingScopes = append(missingScopes, ts)
 		}
 	}
 
 	// Report on any missing scopes
-	if !pkg.FindStringInSlice(scopesSlice, "api") && len(missingScopes) != 0 {
+	if !internal.FindStringInSlice(response.Scopes, "api") && len(missingScopes) != 0 {
 		return fmt.Errorf("the supplied github token is missing authorization scopes - please add: %v", missingScopes)
 	}
 

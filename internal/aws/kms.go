@@ -13,9 +13,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (conf *AWSConfiguration) GetKmsKeyID(keyAlias string) (string, error) {
-
-	var kmsKeyId string
+func (conf *Configuration) GetKmsKeyID(keyAlias string) (string, error) {
+	var kmsKeyID string
 	kmsClient := kms.NewFromConfig(conf.Config)
 
 	kmsKeys, err := kmsClient.ListAliases(context.Background(), &kms.ListAliasesInput{})
@@ -27,9 +26,9 @@ func (conf *AWSConfiguration) GetKmsKeyID(keyAlias string) (string, error) {
 		if *k.AliasName == keyAlias {
 			log.Info().Msgf("kms key with alias %s found", *k.AliasName)
 			log.Info().Msgf("kms key id for vault dynamodb is: %s", *k.TargetKeyId)
-			kmsKeyId = *k.TargetKeyId
+			kmsKeyID = *k.TargetKeyId
 		}
 	}
 
-	return kmsKeyId, nil
+	return kmsKeyID, nil
 }

@@ -13,8 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-func (conf *AWSConfiguration) GetCallerIdentity() (*sts.GetCallerIdentityOutput, error) {
-
+func (conf *Configuration) GetCallerIdentity() (*sts.GetCallerIdentityOutput, error) {
 	stsClient := sts.NewFromConfig(conf.Config)
 	iamCaller, err := stsClient.GetCallerIdentity(
 		context.Background(),

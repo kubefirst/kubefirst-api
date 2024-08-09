@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +15,6 @@ import (
 func GetEnvironments(c *gin.Context) {
 	kcfg := utils.GetKubernetesClient("TODO: SECRETS")
 	environments, err := secrets.GetEnvironments(kcfg.Clientset)
-
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 			Message: err.Error(),
@@ -28,7 +26,6 @@ func GetEnvironments(c *gin.Context) {
 }
 
 func CreateEnvironment(c *gin.Context) {
-
 	// Bind to variable as application/json, handle error
 	var environmentDefinition pkgtypes.Environment
 	err := c.Bind(&environmentDefinition)
@@ -40,7 +37,6 @@ func CreateEnvironment(c *gin.Context) {
 	}
 
 	newEnv, err := environments.NewEnvironment(environmentDefinition)
-
 	if err != nil {
 		c.JSON(http.StatusConflict, types.JSONFailureResponse{
 			Message: err.Error(),
@@ -52,7 +48,7 @@ func CreateEnvironment(c *gin.Context) {
 }
 
 func DeleteEnvironment(c *gin.Context) {
-	envId, param := c.Params.Get("environment_id")
+	envID, param := c.Params.Get("environment_id")
 
 	if !param {
 		c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
@@ -62,8 +58,7 @@ func DeleteEnvironment(c *gin.Context) {
 	}
 
 	kcfg := utils.GetKubernetesClient("TODO: SECRETS")
-	err := secrets.DeleteEnvironment(kcfg.Clientset, envId)
-
+	err := secrets.DeleteEnvironment(kcfg.Clientset, envID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 			Message: err.Error(),
@@ -72,13 +67,12 @@ func DeleteEnvironment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, types.JSONSuccessResponse{
-		Message: fmt.Sprintf("successfully deleted environment with id: %v", envId),
+		Message: fmt.Sprintf("successfully deleted environment with id: %v", envID),
 	})
-
 }
 
 func UpdateEnvironment(c *gin.Context) {
-	envId, param := c.Params.Get("environment_id")
+	envID, param := c.Params.Get("environment_id")
 
 	if !param {
 		c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
@@ -104,7 +98,7 @@ func UpdateEnvironment(c *gin.Context) {
 	}
 
 	kcfg := utils.GetKubernetesClient("TODO: SECRETS")
-	updateErr := secrets.UpdateEnvironment(kcfg.Clientset, envId, environmentUpdate)
+	updateErr := secrets.UpdateEnvironment(kcfg.Clientset, envID, environmentUpdate)
 
 	if updateErr != nil {
 		c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
@@ -114,7 +108,6 @@ func UpdateEnvironment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, types.JSONSuccessResponse{
-		Message: fmt.Sprintf("successfully updated environment with id: %v", envId),
+		Message: fmt.Sprintf("successfully updated environment with id: %v", envID),
 	})
-
 }

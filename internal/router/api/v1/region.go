@@ -67,23 +67,29 @@ func PostRegions(c *gin.Context) {
 			})
 			return
 		}
-		var awsConf *awsinternal.AWSConfiguration
+		var awsConf *awsinternal.Configuration
 		if os.Getenv("IS_CLUSTER_ZERO") == "false" {
-			awsConf = &awsinternal.AWSConfiguration{
+			awsConf = &awsinternal.Configuration{
 				Config: aws.NewEKSServiceAccountClientV1(),
 			}
 		} else {
-			awsConf = &awsinternal.AWSConfiguration{
-				Config: awsinternal.NewAwsV3(
-					regionListRequest.CloudRegion,
-					regionListRequest.AWSAuth.AccessKeyID,
-					regionListRequest.AWSAuth.SecretAccessKey,
-					regionListRequest.AWSAuth.SessionToken,
-				),
+			conf, err := awsinternal.NewAwsV3(
+				regionListRequest.CloudRegion,
+				regionListRequest.AWSAuth.AccessKeyID,
+				regionListRequest.AWSAuth.SecretAccessKey,
+				regionListRequest.AWSAuth.SessionToken,
+			)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
+					Message: fmt.Sprintf("error creating aws client: %s", err),
+				})
+				return
 			}
+
+			awsConf = &awsinternal.Configuration{Config: conf}
 		}
 
-		regions, err := awsConf.GetRegions(regionListRequest.CloudRegion)
+		regions, err := awsConf.GetRegions()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 				Message: err.Error(),
@@ -98,12 +104,12 @@ func PostRegions(c *gin.Context) {
 			})
 			return
 		}
-		civoConf := civo.CivoConfiguration{
+		civoConf := civo.Configuration{
 			Client:  civo.NewCivo(regionListRequest.CivoAuth.Token, regionListRequest.CloudRegion),
 			Context: context.Background(),
 		}
 
-		regions, err := civoConf.GetRegions(regionListRequest.CloudRegion)
+		regions, err := civoConf.GetRegions()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 				Message: err.Error(),
@@ -118,7 +124,7 @@ func PostRegions(c *gin.Context) {
 			})
 			return
 		}
-		digitaloceanConf := digitalocean.DigitaloceanConfiguration{
+		digitaloceanConf := digitalocean.Configuration{
 			Client:  digitalocean.NewDigitalocean(regionListRequest.DigitaloceanAuth.Token),
 			Context: context.Background(),
 		}
@@ -138,7 +144,7 @@ func PostRegions(c *gin.Context) {
 			})
 			return
 		}
-		vultrConf := vultr.VultrConfiguration{
+		vultrConf := vultr.Configuration{
 			Client:  vultr.NewVultr(regionListRequest.VultrAuth.Token),
 			Context: context.Background(),
 		}
@@ -158,9 +164,9 @@ func PostRegions(c *gin.Context) {
 			})
 			return
 		}
-		googleConf := google.GoogleConfiguration{
+		googleConf := google.Configuration{
 			Context: context.Background(),
-			Project: regionListRequest.GoogleAuth.ProjectId,
+			Project: regionListRequest.GoogleAuth.ProjectID,
 			Region:  regionListRequest.CloudRegion,
 			KeyFile: regionListRequest.GoogleAuth.KeyFile,
 		}
@@ -175,7 +181,7 @@ func PostRegions(c *gin.Context) {
 		regionListResponse.Regions = regions
 
 	case "k3s":
-		regionListResponse.Regions = []string{"on-premise (compatibilty-mode)"}
+		regionListResponse.Regions = []string{"on-premise (compatibility-mode)"}
 
 	case "akamai":
 		tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: regionListRequest.AkamaiAuth.Token})

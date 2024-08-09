@@ -7,15 +7,13 @@ See the LICENSE file for more details.
 package vault
 
 import (
-	vaultapi "github.com/hashicorp/vault/api"
+	"github.com/hashicorp/vault/api"
 )
 
-var Conf VaultConfiguration = VaultConfiguration{
+var Conf = Configuration{
 	Config: NewVault(),
 }
 
-func NewVault() vaultapi.Config {
-	config := vaultapi.DefaultConfig()
-
-	return *config
+func NewVault() *api.Config {
+	return api.DefaultConfig()
 }

@@ -2,6 +2,6 @@ package vault
 
 import internal "github.com/kubefirst/kubefirst-api/internal/vault"
 
-type VaultConfiguration = internal.VaultConfiguration
+type Configuration = internal.Configuration
 
 var NewVault = internal.NewVault

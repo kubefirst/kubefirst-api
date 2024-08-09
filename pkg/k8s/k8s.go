@@ -6,19 +6,23 @@ type KubernetesClient = internal.KubernetesClient
 
 var CheckForExistingPortForwards = internal.CheckForExistingPortForwards
 
-var CreateKubeConfig = internal.CreateKubeConfig
-var ReturnDeploymentObject = internal.ReturnDeploymentObject
-var WaitForDeploymentReady = internal.WaitForDeploymentReady
-var VerifyArgoCDReadiness = internal.VerifyArgoCDReadiness
-var GetSecretValue = internal.GetSecretValue
-var OpenPortForwardPodWrapper = internal.OpenPortForwardPodWrapper
-var ReturnStatefulSetObject = internal.ReturnStatefulSetObject
-var WaitForStatefulSetReady = internal.WaitForStatefulSetReady
-var ReturnJobObject = internal.ReturnJobObject
-var WaitForJobComplete = internal.WaitForJobComplete
-var UpdateSecretV2 = internal.UpdateSecretV2
+var (
+	CreateKubeConfig          = internal.CreateKubeConfig
+	ReturnDeploymentObject    = internal.ReturnDeploymentObject
+	WaitForDeploymentReady    = internal.WaitForDeploymentReady
+	VerifyArgoCDReadiness     = internal.VerifyArgoCDReadiness
+	GetSecretValue            = internal.GetSecretValue
+	OpenPortForwardPodWrapper = internal.OpenPortForwardPodWrapper
+	ReturnStatefulSetObject   = internal.ReturnStatefulSetObject
+	WaitForStatefulSetReady   = internal.WaitForStatefulSetReady
+	ReturnJobObject           = internal.ReturnJobObject
+	WaitForJobComplete        = internal.WaitForJobComplete
+	UpdateSecretV2            = internal.UpdateSecretV2
+)
 
-var ReadSecretV2Old = internal.ReadSecretV2Old
-var ReadSecretV2 = internal.ReadSecretV2
-var ReadService = internal.ReadService
-var CreateSecretV2 = internal.CreateSecretV2
+var (
+	ReadSecretV2Old = internal.ReadSecretV2Old
+	ReadSecretV2    = internal.ReadSecretV2
+	ReadService     = internal.ReadService
+	CreateSecretV2  = internal.CreateSecretV2
+)

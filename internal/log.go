@@ -61,7 +61,6 @@ func shortCallerMarshalFunc(pc uintptr, file string, line int) string {
 // debug (zerolog.DebugLevel, 0)
 // trace (zerolog.TraceLevel, -1)
 func GetLogLevelByString(logLevel string) zerolog.Level {
-
 	level := make(map[string]zerolog.Level)
 	level["trace"] = zerolog.TraceLevel
 	level["debug"] = zerolog.DebugLevel
@@ -72,5 +71,4 @@ func GetLogLevelByString(logLevel string) zerolog.Level {
 	level["panic"] = zerolog.PanicLevel
 
 	return level[logLevel]
-
 }

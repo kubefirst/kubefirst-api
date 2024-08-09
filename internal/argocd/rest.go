@@ -26,9 +26,9 @@ func RestPatchArgoCD(clientset kubernetes.Interface, applicationName string, pay
 		Body(payload).
 		DoRaw(context.Background())
 	if err != nil {
-		return err
+		return fmt.Errorf("error patching ArgoCD application %q: %w", applicationName, err)
 	}
-	log.Info().Msgf("patched %s successfully", applicationName)
 
+	log.Info().Msgf("patched %s successfully", applicationName)
 	return nil
 }

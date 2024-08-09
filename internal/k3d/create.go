@@ -58,7 +58,7 @@ func ClusterCreate(clusterName string, k1Dir string, k3dClient string, kubeconfi
 		return err
 	}
 
-	err = os.WriteFile(kubeconfig, []byte(kConfigString), 0644)
+	err = os.WriteFile(kubeconfig, []byte(kConfigString), 0o644)
 	if err != nil {
 		log.Error().Err(err).Msg("error updating config")
 		return fmt.Errorf("error updating config")
@@ -94,7 +94,7 @@ func ClusterCreateConsoleAPI(clusterName string, k1Dir string, k3dClient string,
 		return err
 	}
 
-	err = os.WriteFile(kubeconfig, []byte(kConfigString), 0644)
+	err = os.WriteFile(kubeconfig, []byte(kConfigString), 0o644)
 	if err != nil {
 		log.Error().Err(err).Msg("error updating config")
 		return fmt.Errorf("error updating config")
@@ -108,11 +108,11 @@ func PrepareGitRepositories(
 	gitProvider string,
 	clusterName string,
 	clusterType string,
-	DestinationGitopsRepoURL string,
+	destinationGitopsRepoURL string,
 	gitopsDir string,
 	gitopsTemplateBranch string,
 	gitopsTemplateURL string,
-	DestinationMetaphorRepoURL string,
+	destinationMetaphorRepoURL string,
 	k1Dir string,
 	gitopsTokens *GitopsDirectoryValues,
 	metaphorDir string,
@@ -120,8 +120,7 @@ func PrepareGitRepositories(
 	gitProtocol string,
 	removeAtlantis bool,
 ) error {
-
-	//* clone the gitops-template repo
+	// * clone the gitops-template repo
 	gitopsRepo, err := gitClient.CloneRefSetMain(gitopsTemplateBranch, gitopsDir, gitopsTemplateURL)
 	if err != nil {
 		log.Panic().Msgf("error opening repo at: %s, err: %v", gitopsDir, err)
@@ -129,46 +128,46 @@ func PrepareGitRepositories(
 	log.Info().Msg("gitops repository clone complete")
 
 	// * adjust the content for the gitops repo
-	err = AdjustGitopsRepo(CloudProvider, clusterName, clusterType, gitopsDir, gitProvider, k1Dir, removeAtlantis, true)
+	err = AdjustGitopsRepo(CloudProvider, clusterName, clusterType, gitopsDir, gitProvider, removeAtlantis, true)
 	if err != nil {
 		log.Info().Msgf("err: %v", err)
 		return err
 	}
 
 	// * detokenize the gitops repo
-	detokenizeGitGitops(gitopsDir, gitopsTokens, gitProtocol)
+	err = detokenizeGitGitops(gitopsDir, gitopsTokens, gitProtocol)
 	if err != nil {
 		return err
 	}
 
 	// * add new remote
-	err = gitClient.AddRemote(DestinationGitopsRepoURL, gitProvider, gitopsRepo)
+	err = gitClient.AddRemote(destinationGitopsRepoURL, gitProvider, gitopsRepo)
 	if err != nil {
 		return err
 	}
 
 	// ! metaphor
 	// * adjust the content for the gitops repo
-	err = AdjustMetaphorRepo(DestinationMetaphorRepoURL, gitopsDir, gitProvider, k1Dir)
+	err = AdjustMetaphorRepo(destinationMetaphorRepoURL, gitopsDir, gitProvider, k1Dir)
 	if err != nil {
 		return err
 	}
 
 	// * detokenize the gitops repo
-	detokenizeGitMetaphor(metaphorDir, metaphorTokens)
+	err = detokenizeGitMetaphor(metaphorDir, metaphorTokens)
 	if err != nil {
 		return err
 	}
 
 	metaphorRepo, _ := git.PlainOpen(metaphorDir)
-	//* commit initial gitops-template content
+	// * commit initial gitops-template content
 	err = gitClient.Commit(metaphorRepo, "committing initial detokenized metaphor repo content")
 	if err != nil {
 		return err
 	}
 
 	// * add new remote
-	err = gitClient.AddRemote(DestinationMetaphorRepoURL, gitProvider, metaphorRepo)
+	err = gitClient.AddRemote(destinationMetaphorRepoURL, gitProvider, metaphorRepo)
 	if err != nil {
 		return err
 	}
@@ -183,16 +182,9 @@ func PrepareGitRepositories(
 	return nil
 }
 
-func PostRunPrepareGitopsRepository(clusterName string,
-	//destinationGitopsRepoGitURL string,
-	gitopsDir string,
-	//gitopsRepo *git.Repository,
-	tokens *GitopsDirectoryValues,
-) error {
-
-	err := postRunDetokenizeGitGitops(gitopsDir, tokens)
-	if err != nil {
-		return err
+func PostRunPrepareGitopsRepository(gitopsDir string) error {
+	if err := postRunDetokenizeGitGitops(gitopsDir); err != nil {
+		return fmt.Errorf("error walking path %q: %w", gitopsDir, err)
 	}
 	return nil
 }

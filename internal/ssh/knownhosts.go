@@ -8,8 +8,8 @@ package ssh
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +24,7 @@ func GetHostKey(host string) (ssh.PublicKey, error) {
 	// ~/.ssh/known_hosts
 	file, err := os.Open(filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts"))
 	if err != nil {
-		return nil, fmt.Errorf("file does not exist")
+		return nil, errors.New("file does not exist")
 	}
 	defer file.Close()
 
@@ -40,7 +40,7 @@ func GetHostKey(host string) (ssh.PublicKey, error) {
 
 			hostKey, _, _, _, err = ssh.ParseAuthorizedKey(scanner.Bytes())
 			if err != nil {
-				log.Fatalf("error parsing %q: %v", fields[2], err)
+				return nil, fmt.Errorf("error parsing %q: %v", fields[2], err)
 			}
 			break
 		}

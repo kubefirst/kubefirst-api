@@ -28,23 +28,23 @@ func ReturnJobObject(clientset *kubernetes.Clientset, namespace string, jobName 
 }
 
 // WaitForJobComplete waits for a target Job to reach completion
-func WaitForJobComplete(clientset *kubernetes.Clientset, job *batchv1.Job, timeoutSeconds int64) (bool, error) {
+func WaitForJobComplete(clientset *kubernetes.Clientset, jobName, jobNamespace string, timeoutSeconds int64) (bool, error) {
 	// Format list for metav1.ListOptions for watch
 	watchOptions := metav1.ListOptions{
 		FieldSelector: fmt.Sprintf(
-			"metadata.name=%s", job.Name),
+			"metadata.name=%s", jobName),
 	}
 
 	// Create watch operation
 	objWatch, err := clientset.
 		BatchV1().
-		Jobs(job.ObjectMeta.Namespace).
+		Jobs(jobNamespace).
 		Watch(context.Background(), watchOptions)
 	if err != nil {
 		log.Error().Msgf("error when attempting to wait for Job: %s", err)
 		return false, err
 	}
-	log.Info().Msgf("waiting for %s Job completion. This could take up to %v seconds.", job.Name, timeoutSeconds)
+	log.Info().Msgf("waiting for %s Job completion. This could take up to %v seconds.", jobName, timeoutSeconds)
 
 	// Feed events using provided channel
 	objChan := objWatch.ResultChan()
@@ -56,12 +56,12 @@ func WaitForJobComplete(clientset *kubernetes.Clientset, job *batchv1.Job, timeo
 		case event, ok := <-objChan:
 			if !ok {
 				// Error if the channel closes
-				log.Error().Msgf("failed to wait for job %s to complete", job.Name)
+				log.Error().Msgf("failed to wait for job %s to complete", jobName)
 			}
 			if event.
 				Object.(*batchv1.Job).
 				Status.Succeeded > 0 {
-				log.Info().Msgf("job %s completed at %s.", job.Name, event.Object.(*batchv1.Job).Status.CompletionTime)
+				log.Info().Msgf("job %s completed at %s.", jobName, event.Object.(*batchv1.Job).Status.CompletionTime)
 				return true, nil
 			}
 		case <-time.After(time.Duration(timeoutSeconds) * time.Second):

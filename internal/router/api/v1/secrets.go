@@ -40,7 +40,6 @@ func GetClusterSecret(c *gin.Context) {
 	kubefirstSecrets, _ := k8s.ReadSecretV2Old(kcfg.Clientset, "kubefirst", secret)
 
 	jsonString, err := secrets.MapToStructuredJSON(kubefirstSecrets)
-
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 			Message: err.Error(),

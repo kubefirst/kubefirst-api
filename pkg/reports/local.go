@@ -7,82 +7,20 @@ See the LICENSE file for more details.
 package reports
 
 import (
-	"bytes"
-	"fmt"
-	"log"
-	"strings"
-
 	"github.com/kubefirst/kubefirst-api/internal/k3d"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
-var caser = cases.Title(language.AmericanEnglish)
-
 // LocalHandoffScreenV2 prints the handoff screen
-func LocalHandoffScreenV2(argocdAdminPassword, clusterName, gitDestDescriptor string, gitOwner string, config *k3d.K3dConfig, silentMode bool) {
-	// prepare data for the handoff report
-	if silentMode {
-		log.Printf("[#99] Silent mode enabled, LocalHandoffScreen skipped, please check ~/.kubefirst file for your cluster and service credentials.")
-		return
-	}
-
-	var handOffData bytes.Buffer
-
-	handOffData.WriteString(strings.Repeat("-", 70))
-	handOffData.WriteString("\n			!!! THIS TEXT BOX SCROLLS (use arrow keys) !!!")
-
-	handOffData.WriteString(fmt.Sprintf("\n\nCluster %q is up and running!:", clusterName))
-	handOffData.WriteString("\nThis information is available at $HOME/.kubefirst ")
-	handOffData.WriteString("\n")
-	handOffData.WriteString("\nPress ESC to leave this screen and return to your shell.")
-
-	handOffData.WriteString("\n\nNote:")
-	handOffData.WriteString("\n  Kubefirst generated certificates to ensure secure connections to")
-	handOffData.WriteString("\n  your local kubernetes services. However they will not be")
-	handOffData.WriteString("\n  trusted by your browser by default.")
-	handOffData.WriteString("\n")
-	handOffData.WriteString("\n  To remove these warnings, you can install a new certificate ")
-	handOffData.WriteString("\n  to your local trust store by running the following command: ")
-	handOffData.WriteString(fmt.Sprintf("\n"+"\n    %s -install"+"\n", config.MkCertClient))
-	handOffData.WriteString("\n  For more details on the mkcert utility, please see:")
-	handOffData.WriteString("\n  https://github.com/FiloSottile/mkcert")
-
-	handOffData.WriteString(fmt.Sprintf("\n\n--- %s ", caser.String(config.GitProvider)))
-	handOffData.WriteString(strings.Repeat("-", 59))
-	handOffData.WriteString(fmt.Sprintf("\n %s: %s", caser.String(gitDestDescriptor), gitOwner))
-	handOffData.WriteString("\n Repositories: ")
-	handOffData.WriteString(fmt.Sprintf("\n  %s", config.DestinationGitopsRepoURL))
-	handOffData.WriteString(fmt.Sprintf("\n  %s", config.DestinationMetaphorRepoURL))
-
-	handOffData.WriteString("\n--- Kubefirst Console ")
-	handOffData.WriteString(strings.Repeat("-", 48))
-	handOffData.WriteString(fmt.Sprintf("\n URL: %s", k3d.KubefirstConsoleURL))
-
-	handOffData.WriteString("\n--- ArgoCD ")
-	handOffData.WriteString(strings.Repeat("-", 59))
-	handOffData.WriteString(fmt.Sprintf("\n URL: %s", k3d.ArgocdURL))
-
-	handOffData.WriteString("\n--- Vault ")
-	handOffData.WriteString(strings.Repeat("-", 60))
-	handOffData.WriteString(fmt.Sprintf("\n URL: %s", k3d.VaultURL))
-	handOffData.WriteString("\n" + strings.Repeat("-", 70))
-
-	handOffData.WriteString("\n\nNote:")
-	handOffData.WriteString("\n  To retrieve root credentials for your kubefirst platform, including")
-	handOffData.WriteString("\n  ArgoCD, the kbot user password, and Vault, run the following command:")
-	handOffData.WriteString(fmt.Sprintf("\n"+"\n    kubefirst %s root-credentials"+"\n", k3d.CloudProvider))
-	handOffData.WriteString("\n  Note that this command allows you to copy these passwords directly")
-	handOffData.WriteString("\n  to your clipboard. Provide the -h flag for additional details.")
-
-	handOffData.WriteString("\n\nNote:")
-	handOffData.WriteString("\n  The kubefirst CLI process is still running. This is a convenience")
-	handOffData.WriteString("\n  feature that keeps port-forwarding active so you can reach your")
-	handOffData.WriteString("\n  Kubernetes cluster. Before attempting to run any additional")
-	handOffData.WriteString("\n  commands, such as `destroy`, please end this process by pressing")
-	handOffData.WriteString("\n  ESC (escape) to release the port allocations. If you attempt to")
-	handOffData.WriteString("\n  run any additional commands before doing so, you may get errors")
-	handOffData.WriteString("\n  or warnings about ports already being in use.")
-
-	CommandSummary(handOffData)
+func LocalHandoffScreenV2(clusterName, gitDestDescriptor string, gitOwner string, config *k3d.Config, silentMode bool) {
+	renderHandoff(Opts{
+		ClusterName:             clusterName,
+		DomainName:              k3d.DomainName,
+		GitOwner:                gitOwner,
+		GitProvider:             config.GitProvider,
+		DestinationGitopsRepo:   config.DestinationGitopsRepoURL,
+		DestinationMetaphorRepo: config.DestinationMetaphorRepoURL,
+		CloudProvider:           k3d.CloudProvider,
+		MkCertClient:            config.MkCertClient,
+		CustomOwnerName:         gitDestDescriptor,
+	}, silentMode)
 }

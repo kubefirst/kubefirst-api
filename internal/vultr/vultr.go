@@ -10,15 +10,15 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"time"
 
 	"github.com/kubefirst/kubefirst-api/internal/dns"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 	"github.com/rs/zerolog/log"
 	"github.com/vultr/govultr/v3"
 )
 
-func (c *VultrConfiguration) TestDomainLiveness(domainName string) bool {
+func (c *Configuration) TestDomainLiveness(domainName string) bool {
 	vultrRecordName := "kubefirst-liveness"
 	vultrRecordValue := "domain record propagated"
 
@@ -33,7 +33,7 @@ func (c *VultrConfiguration) TestDomainLiveness(domainName string) bool {
 	log.Info().Msgf("checking to see if record %s exists", domainName)
 	log.Info().Msgf("domainName %s", domainName)
 
-	//check for existing records
+	// check for existing records
 	records, err := c.GetDNSRecords(domainName)
 	if err != nil {
 		log.Error().Msgf("error getting vultr dns records for domain %s: %s", domainName, err)
@@ -46,7 +46,7 @@ func (c *VultrConfiguration) TestDomainLiveness(domainName string) bool {
 		}
 	}
 
-	//create record if it does not exist
+	// create record if it does not exist
 	_, _, err = c.Client.DomainRecord.Create(c.Context, domainName, vultrRecordConfig)
 	if err != nil {
 		log.Warn().Msgf("%s", err)
@@ -87,7 +87,7 @@ func (c *VultrConfiguration) TestDomainLiveness(domainName string) bool {
 }
 
 // GetStorageBuckets retrieves all Vultr object storage buckets
-func (c *VultrConfiguration) GetDNSRecords(domainName string) ([]govultr.DomainRecord, error) {
+func (c *Configuration) GetDNSRecords(domainName string) ([]govultr.DomainRecord, error) {
 	records, _, _, err := c.Client.DomainRecord.List(c.Context, domainName, &govultr.ListOptions{})
 	if err != nil {
 		log.Error().Msgf("error getting vultr dns records for domain %s: %s", domainName, err)
@@ -98,7 +98,7 @@ func (c *VultrConfiguration) GetDNSRecords(domainName string) ([]govultr.DomainR
 }
 
 // GetDNSInfo determines whether or not a domain exists within Vultr
-func (c *VultrConfiguration) GetDNSInfo(domainName string) (string, error) {
+func (c *Configuration) GetDNSInfo(domainName string) (string, error) {
 	log.Info().Msg("GetDNSInfo (working...)")
 
 	vultrDNSDomain, _, err := c.Client.Domain.Get(c.Context, domainName)
@@ -113,11 +113,7 @@ func (c *VultrConfiguration) GetDNSInfo(domainName string) (string, error) {
 // GetDomainApexContent determines whether or not a target domain features
 // a host responding at zone apex
 func GetDomainApexContent(domainName string) bool {
-	timeout := time.Duration(5 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
+	client := httpCommon.CustomHTTPClient(false, 5*time.Second)
 	exists := false
 	for _, proto := range []string{"http", "https"} {
 		fqdn := fmt.Sprintf("%s://%s", proto, domainName)
@@ -134,14 +130,13 @@ func GetDomainApexContent(domainName string) bool {
 }
 
 // GetDNSDomains lists all available DNS domains
-func (c *VultrConfiguration) GetDNSDomains() ([]string, error) {
-	var domainList []string
-
+func (c *Configuration) GetDNSDomains() ([]string, error) {
 	domains, _, _, err := c.Client.Domain.List(c.Context, &govultr.ListOptions{})
 	if err != nil {
 		return []string{}, err
 	}
 
+	domainList := make([]string, 0, len(domains))
 	for _, domain := range domains {
 		domainList = append(domainList, domain.Domain)
 	}
@@ -150,14 +145,13 @@ func (c *VultrConfiguration) GetDNSDomains() ([]string, error) {
 }
 
 // GetRegions lists all available regions
-func (c *VultrConfiguration) GetRegions() ([]string, error) {
-	var regionList []string
-
+func (c *Configuration) GetRegions() ([]string, error) {
 	regions, _, _, err := c.Client.Region.List(c.Context, &govultr.ListOptions{})
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
 
+	regionList := make([]string, 0, len(regions))
 	for _, region := range regions {
 		regionList = append(regionList, region.ID)
 	}
@@ -165,18 +159,16 @@ func (c *VultrConfiguration) GetRegions() ([]string, error) {
 	return regionList, nil
 }
 
-func (c *VultrConfiguration) ListInstances() ([]string, error) {
-
+func (c *Configuration) ListInstances() ([]string, error) {
 	// can pass empty string to list all plans for second arg to List
 	plans, _, _, err := c.Client.Plan.List(c.Context, "", &govultr.ListOptions{
 		Region: c.Region,
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	var planNames []string
+	planNames := make([]string, 0, len(plans))
 	for _, plan := range plans {
 		planNames = append(planNames, plan.ID)
 	}

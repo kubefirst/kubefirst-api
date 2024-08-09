@@ -7,9 +7,7 @@ See the LICENSE file for more details.
 package aws
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -21,6 +19,7 @@ import (
 	"github.com/kubefirst/kubefirst-api/internal/constants"
 	"github.com/kubefirst/kubefirst-api/internal/errors"
 	gitlab "github.com/kubefirst/kubefirst-api/internal/gitlab"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 	"github.com/kubefirst/kubefirst-api/internal/k8s"
 	"github.com/kubefirst/kubefirst-api/internal/secrets"
 	"github.com/kubefirst/kubefirst-api/internal/utils"
@@ -34,14 +33,25 @@ import (
 func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEvent) error {
 	telemetry.SendEvent(telemetryEvent, telemetry.ClusterDeleteStarted, "")
 
-	// Instantiate aws config
-	config := providerConfigs.GetConfig(cl.ClusterName, cl.DomainName, cl.GitProvider, cl.GitAuth.Owner, cl.GitProtocol, cl.CloudflareAuth.APIToken, cl.CloudflareAuth.OriginCaIssuerKey)
+	// Instantiate provider config
+	config, err := providerConfigs.GetConfig(
+		cl.ClusterName,
+		cl.DomainName,
+		cl.GitProvider,
+		cl.GitAuth.Owner,
+		cl.GitProtocol,
+		cl.CloudflareAuth.APIToken,
+		cl.CloudflareAuth.OriginCaIssuerKey,
+	)
+	if err != nil {
+		return fmt.Errorf("error getting provider config: %w", err)
+	}
 
 	kcfg := utils.GetKubernetesClient(cl.ClusterName)
 
 	cl.Status = constants.ClusterStatusDeleting
-	err := secrets.UpdateCluster(kcfg.Clientset, *cl)
-	if err != nil {
+
+	if err := secrets.UpdateCluster(kcfg.Clientset, *cl); err != nil {
 		return err
 	}
 
@@ -80,7 +90,7 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 
 			// Before removing Terraform resources, remove any container registry repositories
 			// since failing to remove them beforehand will result in an apply failure
-			var projectsForDeletion = []string{"gitops", "metaphor"}
+			projectsForDeletion := []string{"gitops", "metaphor"}
 			for _, project := range projectsForDeletion {
 				projectExists, err := gitlabClient.CheckProjectExists(project)
 				if err != nil {
@@ -122,7 +132,6 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 
 			cl.GitTerraformApplyCheck = false
 			err = secrets.UpdateCluster(kcfg.Clientset, *cl)
-
 			if err != nil {
 				return err
 			}
@@ -131,13 +140,19 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 
 	if cl.CloudTerraformApplyCheck || cl.CloudTerraformApplyFailedCheck {
 		if !cl.ArgoCDDeleteRegistryCheck {
-			awsClient := &awsinternal.AWSConfiguration{
-				Config: awsinternal.NewAwsV3(
-					cl.CloudRegion,
-					cl.AWSAuth.AccessKeyID,
-					cl.AWSAuth.SecretAccessKey,
-					cl.AWSAuth.SessionToken,
-				),
+			conf, err := awsinternal.NewAwsV3(
+				cl.CloudRegion,
+				cl.AWSAuth.AccessKeyID,
+				cl.AWSAuth.SecretAccessKey,
+				cl.AWSAuth.SessionToken,
+			)
+			if err != nil {
+				errors.HandleClusterError(cl, err.Error())
+				return fmt.Errorf("error creating aws client: %w", err)
+			}
+
+			awsClient := &awsinternal.Configuration{
+				Config: conf,
 			}
 			kcfg := awsext.CreateEKSKubeconfig(&awsClient.Config, cl.ClusterName)
 
@@ -146,13 +161,13 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 			// Only port-forward to ArgoCD and delete registry if ArgoCD was installed
 			if cl.ArgoCDInstallCheck {
 				removeArgoCDApps := []string{"ingress-nginx-components", "ingress-nginx"}
-				err = argocd.ArgoCDApplicationCleanup(kcfg.Clientset, removeArgoCDApps)
+				err = argocd.ApplicationCleanup(kcfg.Clientset, removeArgoCDApps)
 				if err != nil {
 					log.Error().Msgf("encountered error during argocd application cleanup: %s", err)
 				}
 
 				log.Info().Msg("opening argocd port forward")
-				//* ArgoCD port-forward
+				// * ArgoCD port-forward
 				argoCDStopChannel := make(chan struct{}, 1)
 				defer func() {
 					close(argoCDStopChannel)
@@ -182,11 +197,9 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 
 				log.Info().Msgf("port-forward to argocd is available at %s", providerConfigs.ArgocdPortForwardURL)
 
-				customTransport := http.DefaultTransport.(*http.Transport).Clone()
-				customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-				argocdHttpClient := http.Client{Transport: customTransport}
+				client := httpCommon.CustomHTTPClient(true)
 				log.Info().Msg("deleting the registry application")
-				httpCode, _, err := argocd.DeleteApplication(&argocdHttpClient, config.RegistryAppName, argocdAuthToken, "true")
+				httpCode, _, err := argocd.DeleteApplication(client, config.RegistryAppName, argocdAuthToken, "true")
 				if err != nil {
 					errors.HandleClusterError(cl, err.Error())
 					return err
@@ -200,7 +213,6 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 
 			cl.ArgoCDDeleteRegistryCheck = true
 			err = secrets.UpdateCluster(kcfg.Clientset, *cl)
-
 			if err != nil {
 				return err
 			}
@@ -210,7 +222,7 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 		tfEntrypoint := config.GitopsDir + fmt.Sprintf("/terraform/%s", cl.CloudProvider)
 		tfEnvs := map[string]string{}
 		tfEnvs = awsext.GetAwsTerraformEnvs(tfEnvs, cl)
-		tfEnvs["TF_VAR_aws_account_id"] = cl.AWSAccountId
+		tfEnvs["TF_VAR_aws_account_id"] = cl.AWSAccountID
 
 		switch cl.GitProvider {
 		case "github":
@@ -218,7 +230,7 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 		case "gitlab":
 			gid, err := strconv.Atoi(fmt.Sprint(cl.GitlabOwnerGroupID))
 			if err != nil {
-				return fmt.Errorf("couldn't convert gitlab group id to int: %s", err)
+				return fmt.Errorf("couldn't convert gitlab group id to int: %w", err)
 			}
 			tfEnvs = awsext.GetGitlabTerraformEnvs(tfEnvs, gid, cl)
 		}
@@ -238,7 +250,6 @@ func DeleteAWSCluster(cl *pkgtypes.Cluster, telemetryEvent telemetry.TelemetryEv
 
 		cl.CloudTerraformApplyFailedCheck = false
 		err = secrets.UpdateCluster(kcfg.Clientset, *cl)
-
 		if err != nil {
 			return err
 		}

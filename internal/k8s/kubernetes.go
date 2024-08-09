@@ -22,9 +22,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var GitlabSecretClient coreV1Types.SecretInterface
-
-type PatchJson struct {
+type PatchJSON struct {
 	Op   string `json:"op"`
 	Path string `json:"path"`
 }

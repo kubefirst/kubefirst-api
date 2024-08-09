@@ -12,12 +12,12 @@ import (
 	"github.com/digitalocean/godo"
 )
 
-type DigitaloceanConfiguration struct {
+type Configuration struct {
 	Client  *godo.Client
 	Context context.Context
 }
 
-type DigitaloceanSpacesCredentials struct {
+type SpacesCredentials struct {
 	AccessKey       string
 	SecretAccessKey string
 	Endpoint        string

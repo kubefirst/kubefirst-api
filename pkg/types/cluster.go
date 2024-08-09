@@ -12,14 +12,14 @@ import (
 
 // ClusterDefinition describes an incoming request to create a cluster
 type ClusterDefinition struct {
-	//Cluster
+	// Cluster
 	AdminEmail             string             `json:"admin_email" binding:"required"`
 	CloudProvider          string             `json:"cloud_provider" binding:"required,oneof=akamai aws civo digitalocean google k3s vultr"`
 	CloudRegion            string             `json:"cloud_region" binding:"required"`
 	ClusterName            string             `json:"cluster_name,omitempty"`
 	DomainName             string             `json:"domain_name" binding:"required"`
 	SubdomainName          string             `json:"subdomain_name,omitempty"`
-	DnsProvider            string             `json:"dns_provider,omitempty" binding:"required"`
+	DNSProvider            string             `json:"dns_provider,omitempty" binding:"required"`
 	Type                   string             `json:"type" binding:"required,oneof=mgmt workload"`
 	ForceDestroy           bool               `bson:"force_destroy,omitempty" json:"force_destroy,omitempty"`
 	NodeType               string             `json:"node_type" binding:"required"`
@@ -38,7 +38,7 @@ type ClusterDefinition struct {
 	// AWS
 	ECR bool `json:"ecr,omitempty"`
 
-	//Auth
+	// Auth
 	AkamaiAuth       AkamaiAuth       `json:"akamai_auth,omitempty"`
 	AWSAuth          AWSAuth          `json:"aws_auth,omitempty"`
 	CivoAuth         CivoAuth         `json:"civo_auth,omitempty"`
@@ -70,7 +70,7 @@ type Cluster struct {
 	ClusterType            string             `bson:"cluster_type" json:"cluster_type"`
 	DomainName             string             `bson:"domain_name" json:"domain_name"`
 	SubdomainName          string             `bson:"subdomain_name" json:"subdomain_name,omitempty"`
-	DnsProvider            string             `bson:"dns_provider" json:"dns_provider"`
+	DNSProvider            string             `bson:"dns_provider" json:"dns_provider"`
 	PostInstallCatalogApps []GitopsCatalogApp `bson:"post_install_catalog_apps,omitempty" json:"post_install_catalog_apps,omitempty"`
 
 	// Auth
@@ -110,8 +110,8 @@ type Cluster struct {
 	ECR bool `bson:"ecr" json:"ecr"`
 
 	// kms
-	AWSAccountId              string `bson:"aws_account_id,omitempty" json:"aws_account_id,omitempty"`
-	AWSKMSKeyId               string `bson:"aws_kms_key_id,omitempty" json:"aws_kms_key_id,omitempty"`
+	AWSAccountID              string `bson:"aws_account_id,omitempty" json:"aws_account_id,omitempty"`
+	AWSKMSKeyID               string `bson:"aws_kms_key_id,omitempty" json:"aws_kms_key_id,omitempty"`
 	AWSKMSKeyDetokenizedCheck bool   `bson:"aws_kms_key_detokenized_check" json:"aws_kms_key_detokenized_check"`
 
 	// Telemetry
@@ -158,11 +158,11 @@ type PushBucketObject struct {
 
 type ProxyImportRequest struct {
 	Body Cluster `bson:"body" json:"body"`
-	Url  string  `bson:"url" json:"url"`
+	URL  string  `bson:"url" json:"url"`
 }
 
 type ProxyRequest struct {
-	Url string `bson:"url" json:"url"`
+	URL string `bson:"url" json:"url"`
 }
 
 type Environment struct {
@@ -182,7 +182,7 @@ type WorkloadCluster struct {
 	CloudRegion       string      `bson:"cloud_region,omitempty" json:"cloud_region,omitempty"`
 	CreationTimestamp string      `bson:"creation_timestamp" json:"creation_timestamp"`
 	DomainName        string      `bson:"domain_name,omitempty" json:"domain_name,omitempty"`
-	DnsProvider       string      `bson:"dns_provider,omitempty" json:"dns_provider,omitempty"`
+	DNSProvider       string      `bson:"dns_provider,omitempty" json:"dns_provider,omitempty"`
 	Environment       Environment `bson:"environment,omitempty" json:"environment,omitempty"`
 	GitAuth           GitAuth     `bson:"git_auth,omitempty" json:"git_auth,omitempty"`
 	InstanceSize      string      `bson:"instance_size,omitempty" json:"instance_size,omitempty"`

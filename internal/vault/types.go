@@ -8,6 +8,6 @@ package vault
 
 import vaultapi "github.com/hashicorp/vault/api"
 
-type VaultConfiguration struct {
-	Config vaultapi.Config
+type Configuration struct {
+	Config *vaultapi.Config
 }

@@ -18,7 +18,7 @@ import (
 )
 
 // CreateBucket
-func (conf *AWSConfiguration) CreateBucket(bucketName string) (*s3.CreateBucketOutput, error) {
+func (conf *Configuration) CreateBucket(bucketName string) (*s3.CreateBucketOutput, error) {
 	s3Client := s3.NewFromConfig(conf.Config)
 	log.Info().Msg(conf.Config.Region)
 
@@ -30,10 +30,9 @@ func (conf *AWSConfiguration) CreateBucket(bucketName string) (*s3.CreateBucketO
 		if string(location) == conf.Config.Region {
 			locationConstraint = conf.Config.Region
 			break
-		} else {
-			// It defaults to us-east-1 anyway
-			locationConstraint = "us-east-1"
 		}
+
+		locationConstraint = "us-east-1"
 	}
 
 	// Create bucket
@@ -67,7 +66,7 @@ func (conf *AWSConfiguration) CreateBucket(bucketName string) (*s3.CreateBucketO
 }
 
 // DeleteBucket
-func (conf *AWSConfiguration) DeleteBucket(bucketName string) error {
+func (conf *Configuration) DeleteBucket(bucketName string) error {
 	s3Client := s3.NewFromConfig(conf.Config)
 
 	// Create bucket
@@ -84,7 +83,7 @@ func (conf *AWSConfiguration) DeleteBucket(bucketName string) error {
 	return nil
 }
 
-func (conf *AWSConfiguration) ListBuckets() (*s3.ListBucketsOutput, error) {
+func (conf *Configuration) ListBuckets() (*s3.ListBucketsOutput, error) {
 	fmt.Println("listing buckets")
 	s3Client := s3.NewFromConfig(conf.Config)
 

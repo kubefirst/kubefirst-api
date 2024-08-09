@@ -94,7 +94,7 @@ func RemoveFromSlice[T comparable](slice []T, i int) []T {
 
 var BackupResolver = &net.Resolver{
 	PreferGo: true,
-	Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+	Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
 		d := net.Dialer{
 			Timeout: time.Millisecond * time.Duration(10000),
 		}
@@ -134,12 +134,8 @@ func GetKubernetesClient(clusterName string) *k8s.KubernetesClient {
 	// Get Environment variables
 	env, _ := env.GetEnv(constants.SilenceGetEnv)
 
-	//Create Kubernetes Client Context
-	var inCluster bool = false
-	if env.InCluster == "true" {
-		inCluster = true
-	}
-
+	// Create Kubernetes Client Context
+	inCluster := env.InCluster == "true"
 	homeDir, _ := os.UserHomeDir()
 	clusterDir := fmt.Sprintf("%s/.k1/%s", homeDir, clusterName)
 	kubeconfigPath := fmt.Sprintf("%s/kubeconfig", clusterDir)

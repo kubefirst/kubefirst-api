@@ -15,7 +15,6 @@ import (
 
 // HandleClusterError implements an error handler for standalone cluster objects
 func HandleClusterError(cl *pkgtypes.Cluster, condition string) error {
-
 	kcfg := utils.GetKubernetesClient(cl.ClusterName)
 
 	cl.InProgress = false
@@ -23,7 +22,6 @@ func HandleClusterError(cl *pkgtypes.Cluster, condition string) error {
 	cl.LastCondition = condition
 
 	err := secrets.UpdateCluster(kcfg.Clientset, *cl)
-
 	if err != nil {
 		return err
 	}

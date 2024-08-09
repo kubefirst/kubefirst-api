@@ -8,6 +8,7 @@ package vault
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	vaultapi "github.com/hashicorp/vault/api"
@@ -15,13 +16,14 @@ import (
 )
 
 // GetUserPassword retrieves the password for a Vault user at the users mount path
-func (conf *VaultConfiguration) GetUserPassword(endpoint string, token string, username string, key string) (string, error) {
+func (conf *Configuration) GetUserPassword(endpoint string, token string, username string, key string) (string, error) {
 	conf.Config.Address = endpoint
 
-	vaultClient, err := vaultapi.NewClient(&conf.Config)
+	vaultClient, err := vaultapi.NewClient(conf.Config)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error creating vault client: %w", err)
 	}
+
 	vaultClient.SetToken(token)
 	if strings.Contains(endpoint, "http://") {
 		vaultClient.CloneConfig().ConfigureTLS(&vaultapi.TLSConfig{
@@ -33,7 +35,7 @@ func (conf *VaultConfiguration) GetUserPassword(endpoint string, token string, u
 
 	resp, err := vaultClient.KVv2("users").Get(context.Background(), username)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error getting user %q: %w", username, err)
 	}
 
 	return resp.Data[key].(string), nil

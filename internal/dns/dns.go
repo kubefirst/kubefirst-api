@@ -21,13 +21,13 @@ const (
 )
 
 var (
-	CivoNameServers         []string = []string{"ns0.civo.com", "ns1.civo.com"}
-	DigitalOceanNameServers []string = []string{"ns1.digitalocean.com", "ns2.digitalocean.com", "ns3.digitalocean.com"}
-	VultrNameservers        []string = []string{"ns1.vultr.com", "ns2.vultr.com"}
+	CivoNameServers         = []string{"ns0.civo.com", "ns1.civo.com"}
+	DigitalOceanNameServers = []string{"ns1.digitalocean.com", "ns2.digitalocean.com", "ns3.digitalocean.com"}
+	VultrNameservers        = []string{"ns1.vultr.com", "ns2.vultr.com"}
 )
 
 // VerifyProviderDNS
-func VerifyProviderDNS(cloudProvider string, cloudRegion string, domainName string, nameServers []string) error {
+func VerifyProviderDNS(cloudProvider, domainName string, nameServers []string) error {
 	switch cloudProvider {
 	case "aws":
 	case "civo":
@@ -42,31 +42,30 @@ func VerifyProviderDNS(cloudProvider string, cloudRegion string, domainName stri
 
 	foundNSRecords, err := GetDomainNSRecords(domainName)
 	if err != nil {
-		return err
+		return fmt.Errorf("error checking NS record for domain %q: %s", domainName, err)
 	}
 
 	for _, reqrec := range nameServers {
 		if pkg.FindStringInSlice(foundNSRecords, reqrec) {
 			log.Info().Msgf("found NS record %s for domain %s", reqrec, domainName)
-		} else {
-			return fmt.Errorf("missing record %s for domain %s - please add the NS record", reqrec, domainName)
+			break
 		}
 	}
 
-	return nil
+	return fmt.Errorf("missing record for domain %s - please add the NS record", domainName)
 }
 
 // GetDomainNSRecords
 func GetDomainNSRecords(domainName string) ([]string, error) {
 	var dig dnsutil.Dig
-	dig.SetDNS(dnsLookupHost)
+	dig.At(dnsLookupHost)
 
 	records, err := dig.NS(domainName)
 	if err != nil {
-		return []string{}, fmt.Errorf("error checking NS record for domain %s: %s", domainName, err)
+		return nil, fmt.Errorf("error checking NS record for domain %q: %s", domainName, err)
 	}
 
-	var foundNSRecords []string
+	foundNSRecords := make([]string, 0, len(records))
 	for _, rec := range records {
 		foundNSRecords = append(foundNSRecords, strings.TrimSuffix(rec.Ns, "."))
 	}

@@ -7,10 +7,8 @@ See the LICENSE file for more details.
 package argocd
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,6 +16,7 @@ import (
 	v1alpha1ArgocdApplication "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	pkg "github.com/kubefirst/kubefirst-api/internal"
 	"github.com/kubefirst/kubefirst-api/internal/argocdModel"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,41 +69,37 @@ type TLSConfig struct {
 }
 
 // Sync request ArgoCD to manual sync an application.
-func DeleteApplication(httpClient pkg.HTTPDoer, applicationName, argoCDToken, cascade string) (httpCodeResponse int, syncStatus string, Error error) {
-
+func DeleteApplication(httpClient pkg.HTTPDoer, applicationName, argoCDToken, cascade string) (int, string, error) {
 	params := url.Values{}
 	params.Add("cascade", cascade)
 	paramBody := strings.NewReader(params.Encode())
 
 	url := fmt.Sprintf("%s/api/v1/applications/%s", GetArgoEndpoint(), applicationName)
-	log.Info().Msg(url)
+	log.Info().Msgf("deleting application %s using endpoint %q", applicationName, url)
+
 	req, err := http.NewRequest(http.MethodDelete, url, paramBody)
 	if err != nil {
-		log.Error().Err(err).Msg("")
-		return 0, "", err
+		log.Error().Msgf("error creating DELETE request to ArgoCD for application %q: %s", applicationName, err.Error())
+		return 0, "", fmt.Errorf("error creating DELETE request to ArgoCD for application %q: %w", applicationName, err)
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", argoCDToken))
+
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Error().Err(err).Msgf("error sending DELETE request to ArgoCD for application (%s)", applicationName)
-		return res.StatusCode, "", err
+		log.Error().Msgf("error sending DELETE request to ArgoCD for application %q: %s", applicationName, err.Error())
+		return res.StatusCode, "", fmt.Errorf("error sending DELETE request to ArgoCD for application %q: %w", applicationName, err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		log.Warn().Err(err).Msgf("argocd http response code is: %d", res.StatusCode)
+		log.Warn().Err(err).Msgf("argocd http response code for delete action is: %d", res.StatusCode)
 		return res.StatusCode, "", nil
 	}
 
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return res.StatusCode, "", err
-	}
-
 	var syncResponse argocdModel.V1alpha1Application
-	err = json.Unmarshal(body, &syncResponse)
-	if err != nil {
-		return res.StatusCode, "", err
+	if err := json.NewDecoder(res.Body).Decode(&syncResponse); err != nil {
+		log.Error().Msgf("error decoding response body for application %q: %s", applicationName, err.Error())
+		return res.StatusCode, "", fmt.Errorf("error decoding response body for application %q: %w", applicationName, err)
 	}
 
 	return res.StatusCode, syncResponse.Status.Sync.Status, nil
@@ -113,41 +108,32 @@ func DeleteApplication(httpClient pkg.HTTPDoer, applicationName, argoCDToken, ca
 // GetArgoCDApplication by receiving the ArgoCD token, and the application name, this function returns the full
 // application data Application struct. This can be used when a resource needs to be updated, we firstly collect all
 // Application data, update what is necessary and then request the PUT function to update the resource.
-func GetArgoCDApplication(token string, applicationName string) (argocdModel.V1alpha1Application, error) {
-
-	// todo: instantiate a new client on every http request isn't a good idea, we might want to work with methods and
-	//       provide resources via structs.
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	httpClient := http.Client{Transport: customTransport}
+func GetArgoCDApplication(token string, applicationName string) (*argocdModel.V1alpha1Application, error) {
+	httpClient := httpCommon.CustomHTTPClient(true)
 
 	url := pkg.ArgoCDLocalBaseURL + "/applications/" + applicationName
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		log.Error().Err(err).Msg("")
+		log.Error().Msgf("error creating GET request to ArgoCD for application %q: %s", applicationName, err.Error())
+		return nil, fmt.Errorf("error creating GET request to ArgoCD for application %q: %w", applicationName, err)
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return argocdModel.V1alpha1Application{}, err
+		log.Error().Msgf("error sending GET request to ArgoCD for application %q: %s", applicationName, err.Error())
+		return nil, fmt.Errorf("error sending GET request to ArgoCD for application %q: %w", applicationName, err)
 	}
-
 	defer res.Body.Close()
 
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return argocdModel.V1alpha1Application{}, err
-	}
-
 	var response argocdModel.V1alpha1Application
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return argocdModel.V1alpha1Application{}, err
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		log.Error().Msgf("error decoding response body for application %q: %s", applicationName, err.Error())
+		return nil, fmt.Errorf("error decoding response body for application %q: %w", applicationName, err)
 	}
 
-	return response, nil
+	return &response, nil
 }
 
 // GetArgoEndpoint provides a solution in the interim for returning the correct

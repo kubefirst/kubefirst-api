@@ -10,7 +10,11 @@ import (
 	pkg "github.com/kubefirst/kubefirst-api/internal"
 )
 
-func GetGithubTerraformEnvs(config *K3dConfig, envs map[string]string, githubToken string) map[string]string {
+func GetGithubTerraformEnvs(config *Config, envs map[string]string) map[string]string {
+	if envs == nil {
+		envs = make(map[string]string)
+	}
+
 	envs["GITHUB_TOKEN"] = config.GithubToken
 	envs["AWS_ACCESS_KEY_ID"] = pkg.MinioDefaultUsername
 	envs["AWS_SECRET_ACCESS_KEY"] = pkg.MinioDefaultPassword
@@ -20,7 +24,11 @@ func GetGithubTerraformEnvs(config *K3dConfig, envs map[string]string, githubTok
 	return envs
 }
 
-func GetUsersTerraformEnvs(config *K3dConfig, envs map[string]string) map[string]string {
+func GetUsersTerraformEnvs(config *Config, envs map[string]string) map[string]string {
+	if envs == nil {
+		envs = make(map[string]string)
+	}
+
 	envs["TF_VAR_email_address"] = "your@email.com"
 	envs["TF_VAR_github_token"] = config.GithubToken
 	envs["TF_VAR_vault_addr"] = VaultPortForwardURL
@@ -32,7 +40,11 @@ func GetUsersTerraformEnvs(config *K3dConfig, envs map[string]string) map[string
 	return envs
 }
 
-func GetVaultTerraformEnvs(config *K3dConfig, envs map[string]string) map[string]string {
+func GetVaultTerraformEnvs(config *Config, envs map[string]string) map[string]string {
+	if envs == nil {
+		envs = make(map[string]string)
+	}
+
 	envs["TF_VAR_email_address"] = "your@email.com"
 	envs["TF_VAR_github_token"] = config.GithubToken
 	envs["TF_VAR_vault_addr"] = VaultPortForwardURL
@@ -50,6 +62,6 @@ type GithubTerraformEnvs struct {
 	GithubOwner           string
 	AtlantisWebhookSecret string
 	KbotSSHPublicKey      string
-	AwsAccessKeyId        string
+	AwsAccessKeyID        string
 	AwsSecretAccessKey    string
 }

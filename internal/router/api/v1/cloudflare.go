@@ -43,7 +43,7 @@ func PostValidateCloudflareDomain(c *gin.Context) {
 		return
 	}
 
-	cloudflareConf := cloudflare.CloudflareConfiguration{
+	cloudflareConf := cloudflare.Configuration{
 		Client:  client,
 		Context: context.Background(),
 	}

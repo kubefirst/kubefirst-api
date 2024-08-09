@@ -12,7 +12,7 @@ import (
 	"github.com/civo/civogo"
 )
 
-type CivoConfiguration struct {
+type Configuration struct {
 	Client  *civogo.Client
 	Context context.Context
 }

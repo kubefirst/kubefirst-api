@@ -11,7 +11,6 @@ import (
 
 // Currently only needs to support google
 func ListZonesForRegion(c *gin.Context) {
-
 	var zonesListRequest types.ZonesListRequest
 	err := c.Bind(&zonesListRequest)
 	if err != nil {
@@ -21,9 +20,9 @@ func ListZonesForRegion(c *gin.Context) {
 		return
 	}
 
-	googleConf := google.GoogleConfiguration{
+	googleConf := google.Configuration{
 		Context: context.Background(),
-		Project: zonesListRequest.GoogleAuth.ProjectId,
+		Project: zonesListRequest.GoogleAuth.ProjectID,
 		Region:  zonesListRequest.CloudRegion,
 		KeyFile: zonesListRequest.GoogleAuth.KeyFile,
 	}

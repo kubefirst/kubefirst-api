@@ -13,14 +13,11 @@ import (
 
 	"github.com/kubefirst/kubefirst-api/internal/k8s"
 	log "github.com/rs/zerolog/log"
-	"github.com/spf13/afero"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
-
-var fs afero.Fs = afero.NewOsFs()
 
 // CreateKubeConfig returns a struct KubernetesClient with references to a clientset,
 // restConfig, and path to the Kubernetes config used to generate the client

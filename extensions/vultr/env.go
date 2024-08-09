@@ -37,7 +37,7 @@ func GetVultrTerraformEnvs(envs map[string]string, cl *pkgtypes.Cluster) map[str
 	envs["TF_VAR_aws_secret_access_key"] = cl.StateStoreCredentials.SecretAccessKey
 	envs["AWS_SESSION_TOKEN"] = ""        // allows for debugging
 	envs["TF_VAR_aws_session_token"] = "" // allows for debugging
-	//envs["TF_LOG"] = "debug"
+	// envs["TF_LOG"] = "debug"
 
 	return envs
 }
@@ -115,8 +115,7 @@ func GetVaultTerraformEnvs(clientset *kubernetes.Clientset, cl *pkgtypes.Cluster
 	envs["AWS_SESSION_TOKEN"] = ""        // allows for debugging
 	envs["TF_VAR_aws_session_token"] = "" // allows for debugging
 
-	switch cl.GitProvider {
-	case "gitlab":
+	if cl.GitProvider == "gitlab" {
 		envs["TF_VAR_owner_group_id"] = fmt.Sprint(cl.GitlabOwnerGroupID)
 	}
 

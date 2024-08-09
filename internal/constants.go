@@ -11,14 +11,12 @@ import (
 	"runtime"
 )
 
-var (
-	BetaProviders []string = []string{"digitalocean", "google", "vultr"}
-)
+var BetaProviders = [...]string{"digitalocean", "google", "vultr"}
 
 const (
 	JSONContentType              = "application/json"
 	SoftServerURI                = "ssh://127.0.0.1:8022/config"
-	GitHubOAuthClientId          = "2ced340927e0a6c49a45"
+	GitHubOAuthClientID          = "2ced340927e0a6c49a45"
 	CloudK3d                     = "k3d"
 	CloudAws                     = "aws"
 	DefaultS3Region              = "us-east-1"
@@ -63,9 +61,7 @@ const (
 	ArgocdPortForwardURL = "http://localhost:8080"
 )
 
-var (
-	ArgoLocalURLTLS = fmt.Sprintf("https://argo.%s", LocalDomainName)
-)
+var ArgoLocalURLTLS = fmt.Sprintf("https://argo.%s", LocalDomainName)
 
 // ArgoCD
 const (
@@ -90,9 +86,7 @@ const (
 	ChartmuseumLocalURL     = "http://localhost:8181"
 )
 
-var (
-	ChartmuseumLocalURLTLS = fmt.Sprintf("https://chartmuseum.%s", LocalDomainName)
-)
+var ChartmuseumLocalURLTLS = fmt.Sprintf("https://chartmuseum.%s", LocalDomainName)
 
 // Minio
 const (
@@ -104,9 +98,7 @@ const (
 	MinioRegion              = "us-k3d-1"
 )
 
-var (
-	MinioURL = fmt.Sprintf("https://minio.%s", LocalDomainName)
-)
+var MinioURL = fmt.Sprintf("https://minio.%s", LocalDomainName)
 
 // Minio Console
 const (
@@ -116,9 +108,7 @@ const (
 	MinioConsolePodLocalPort = 9001
 )
 
-var (
-	MinioConsoleURLTLS = fmt.Sprintf("https://minio-console.%s", LocalDomainName)
-)
+var MinioConsoleURLTLS = fmt.Sprintf("https://minio-console.%s", LocalDomainName)
 
 // Kubefirst Console
 const (

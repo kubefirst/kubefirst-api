@@ -18,17 +18,19 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const KUBEFIRST_CLUSTERS_SECRET_NAME = "kubefirst-clusters"
-const KUBEFIRST_CLUSTER_PREFIX = "kubefirst-cluster"
+const (
+	secretName    = "kubefirst-clusters"
+	clusterPrefix = "kubefirst-cluster"
+)
 
 // DeleteCluster
 func DeleteCluster(clientSet *kubernetes.Clientset, clusterName string) error {
-	err := DeleteSecretReference(clientSet, KUBEFIRST_CLUSTERS_SECRET_NAME, clusterName)
+	err := DeleteSecretReference(clientSet, secretName, clusterName)
 	if err != nil {
 		return fmt.Errorf("error deleting cluster %s reference", clusterName)
 	}
 
-	err = k8s.DeleteSecretV2(clientSet, "kubefirst", fmt.Sprintf("%s-%s", KUBEFIRST_CLUSTER_PREFIX, clusterName))
+	err = k8s.DeleteSecretV2(clientSet, "kubefirst", fmt.Sprintf("%s-%s", clusterPrefix, clusterName))
 	if err != nil {
 		return fmt.Errorf("error deleting cluster %s: %s", clusterName, err)
 	}
@@ -42,20 +44,20 @@ func DeleteCluster(clientSet *kubernetes.Clientset, clusterName string) error {
 func GetCluster(clientSet *kubernetes.Clientset, clusterName string) (pkgtypes.Cluster, error) {
 	cluster := pkgtypes.Cluster{}
 
-	clusterSecret, err := k8s.ReadSecretV2Old(clientSet, "kubefirst", fmt.Sprintf("%s-%s", KUBEFIRST_CLUSTER_PREFIX, clusterName))
+	clusterSecret, err := k8s.ReadSecretV2Old(clientSet, "kubefirst", fmt.Sprintf("%s-%s", clusterPrefix, clusterName))
 	if err != nil {
-		return cluster, fmt.Errorf("secret not found: %s", err)
+		return cluster, fmt.Errorf("secret not found: %w", err)
 	}
 	jsonString, _ := MapToStructuredJSON(clusterSecret)
 
 	jsonData, err := json.Marshal(jsonString)
 	if err != nil {
-		return cluster, fmt.Errorf("error marshalling json: %s", err)
+		return cluster, fmt.Errorf("error marshalling json: %w", err)
 	}
 
 	err = json.Unmarshal([]byte(jsonData), &cluster)
 	if err != nil {
-		return cluster, fmt.Errorf("unable to cast cluster: %s", err)
+		return cluster, fmt.Errorf("unable to cast cluster: %w", err)
 	}
 
 	return cluster, nil
@@ -64,7 +66,7 @@ func GetCluster(clientSet *kubernetes.Clientset, clusterName string) (pkgtypes.C
 // GetCluster
 func GetClusters(clientSet *kubernetes.Clientset) ([]pkgtypes.Cluster, error) {
 	clusterList := []pkgtypes.Cluster{}
-	clusterReferenceList, _ := GetSecretReference(clientSet, KUBEFIRST_CLUSTERS_SECRET_NAME)
+	clusterReferenceList, _ := GetSecretReference(clientSet, secretName)
 	for _, clusterName := range clusterReferenceList.List {
 		cluster, _ := GetCluster(clientSet, clusterName)
 
@@ -78,15 +80,15 @@ func GetClusters(clientSet *kubernetes.Clientset) ([]pkgtypes.Cluster, error) {
 
 // InsertCluster
 func InsertCluster(clientSet *kubernetes.Clientset, cl pkgtypes.Cluster) error {
-	_, err := GetSecretReference(clientSet, KUBEFIRST_CLUSTERS_SECRET_NAME)
+	_, err := GetSecretReference(clientSet, secretName)
 
 	if err != nil {
-		CreateSecretReference(clientSet, KUBEFIRST_CLUSTERS_SECRET_NAME, pkgtypes.SecretListReference{
+		CreateSecretReference(clientSet, secretName, pkgtypes.SecretListReference{
 			Name: "clusters",
 			List: []string{cl.ClusterName},
 		})
 	} else {
-		err = AddSecretReferenceItem(clientSet, KUBEFIRST_CLUSTERS_SECRET_NAME, cl.ClusterName)
+		err = AddSecretReferenceItem(clientSet, secretName, cl.ClusterName)
 		if err != nil {
 			return err
 		}
@@ -97,16 +99,15 @@ func InsertCluster(clientSet *kubernetes.Clientset, cl pkgtypes.Cluster) error {
 
 	secretToCreate := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", KUBEFIRST_CLUSTER_PREFIX, cl.ClusterName),
+			Name:      fmt.Sprintf("%s-%s", clusterPrefix, cl.ClusterName),
 			Namespace: "kubefirst",
 		},
 		Data: secretValuesMap,
 	}
 
 	err = k8s.CreateSecretV2(clientSet, secretToCreate)
-
 	if err != nil {
-		return fmt.Errorf("error creating kubernetes secret: %s", err)
+		return fmt.Errorf("error creating kubernetes secret: %w", err)
 	}
 
 	return nil
@@ -117,10 +118,9 @@ func UpdateCluster(clientSet *kubernetes.Clientset, cluster pkgtypes.Cluster) er
 	bytes, _ := json.Marshal(cluster)
 	secretValuesMap, _ := ParseJSONToMap(string(bytes))
 
-	err := k8s.UpdateSecretV2(clientSet, "kubefirst", fmt.Sprintf("%s-%s", KUBEFIRST_CLUSTER_PREFIX, cluster.ClusterName), secretValuesMap)
-
+	err := k8s.UpdateSecretV2(clientSet, "kubefirst", fmt.Sprintf("%s-%s", clusterPrefix, cluster.ClusterName), secretValuesMap)
 	if err != nil {
-		return fmt.Errorf("error updating kubernetes secret: %s", err)
+		return fmt.Errorf("error updating kubernetes secret: %w", err)
 	}
 
 	return nil

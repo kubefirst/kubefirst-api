@@ -20,7 +20,7 @@ type QuotaDetailResponse struct {
 }
 
 // GetServiceQuotas
-func (conf *AWSConfiguration) GetServiceQuotas(services []string) (map[string][]QuotaDetailResponse, error) {
+func (conf *Configuration) GetServiceQuotas(services []string) (map[string][]QuotaDetailResponse, error) {
 	// Retrieve all quota information
 	serviceQuotasClient := servicequotas.NewFromConfig(conf.Config)
 	allQuotas := make(map[string][]sqTypes.ServiceQuota)
@@ -58,5 +58,4 @@ func (conf *AWSConfiguration) GetServiceQuotas(services []string) (map[string][]
 	}
 
 	return returnQuotas, nil
-
 }

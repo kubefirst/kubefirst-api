@@ -10,15 +10,15 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"time"
 
 	"github.com/digitalocean/godo"
 	"github.com/kubefirst/kubefirst-api/internal/dns"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 	"github.com/rs/zerolog/log"
 )
 
-func (c *DigitaloceanConfiguration) TestDomainLiveness(domainName string) bool {
+func (c *Configuration) TestDomainLiveness(domainName string) bool {
 	doRecordName := "kubefirst-liveness"
 	doRecordValue := "domain record propagated"
 
@@ -33,7 +33,7 @@ func (c *DigitaloceanConfiguration) TestDomainLiveness(domainName string) bool {
 	log.Info().Msgf("checking to see if record %s exists", domainName)
 	log.Info().Msgf("domainName %s", domainName)
 
-	//check for existing records
+	// check for existing records
 	records, err := c.GetDNSRecords(domainName)
 	if err != nil {
 		log.Error().Msgf("error getting digitalocean dns records for domain %s: %s", domainName, err)
@@ -46,7 +46,7 @@ func (c *DigitaloceanConfiguration) TestDomainLiveness(domainName string) bool {
 		}
 	}
 
-	//create record if it does not exist
+	// create record if it does not exist
 	_, _, err = c.Client.Domains.CreateRecord(c.Context, domainName, doRecordConfig)
 	if err != nil {
 		log.Warn().Msgf("%s", err)
@@ -87,7 +87,7 @@ func (c *DigitaloceanConfiguration) TestDomainLiveness(domainName string) bool {
 }
 
 // GetDNSRecords retrieves DNS records
-func (c *DigitaloceanConfiguration) GetDNSRecords(domainName string) ([]godo.DomainRecord, error) {
+func (c *Configuration) GetDNSRecords(domainName string) ([]godo.DomainRecord, error) {
 	records, _, err := c.Client.Domains.Records(c.Context, domainName, &godo.ListOptions{})
 	if err != nil {
 		log.Error().Msgf("error getting digitalocean dns records for domain %s: %s", domainName, err)
@@ -98,7 +98,7 @@ func (c *DigitaloceanConfiguration) GetDNSRecords(domainName string) ([]godo.Dom
 }
 
 // GetDNSInfo determines whether or not a domain exists within digitalocean
-func (c *DigitaloceanConfiguration) GetDNSInfo(domainName string) (string, error) {
+func (c *Configuration) GetDNSInfo(domainName string) (string, error) {
 	log.Info().Msg("GetDNSInfo (working...)")
 
 	doDNSDomain, _, err := c.Client.Domains.Get(c.Context, domainName)
@@ -113,11 +113,7 @@ func (c *DigitaloceanConfiguration) GetDNSInfo(domainName string) (string, error
 // GetDomainApexContent determines whether or not a target domain features
 // a host responding at zone apex
 func GetDomainApexContent(domainName string) bool {
-	timeout := time.Duration(5 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
+	client := httpCommon.CustomHTTPClient(false, 5*time.Second)
 	exists := false
 	for _, proto := range []string{"http", "https"} {
 		fqdn := fmt.Sprintf("%s://%s", proto, domainName)
@@ -134,14 +130,13 @@ func GetDomainApexContent(domainName string) bool {
 }
 
 // GetDNSDomains lists all available DNS domains
-func (c *DigitaloceanConfiguration) GetDNSDomains() ([]string, error) {
-	var domainList []string
-
+func (c *Configuration) GetDNSDomains() ([]string, error) {
 	domains, _, err := c.Client.Domains.List(c.Context, &godo.ListOptions{})
 	if err != nil {
 		return []string{}, err
 	}
 
+	domainList := make([]string, 0, len(domains))
 	for _, domain := range domains {
 		domainList = append(domainList, domain.Name)
 	}
@@ -150,7 +145,7 @@ func (c *DigitaloceanConfiguration) GetDNSDomains() ([]string, error) {
 }
 
 // DeleteDNSRecords deletes provided DNS records
-func (c *DigitaloceanConfiguration) DeleteDNSRecords(domainName string, dryRun bool) error {
+func (c *Configuration) DeleteDNSRecords(domainName string, dryRun bool) error {
 	records, _, err := c.Client.Domains.Records(c.Context, domainName, &godo.ListOptions{})
 	if err != nil {
 		log.Error().Msgf("error getting digitalocean dns records for domain %s: %s", domainName, err)
@@ -159,11 +154,10 @@ func (c *DigitaloceanConfiguration) DeleteDNSRecords(domainName string, dryRun b
 
 	for _, rec := range records {
 		if rec.Type == "A" || rec.Type == "TXT" {
-
 			msg := fmt.Sprintf("delete digitalocean dns record %s.%s [%s] %s", rec.Name, domainName, rec.Type, rec.Data)
 
 			if dryRun {
-				msg = msg + " [dry run]"
+				msg += " [dry run]"
 			}
 
 			log.Info().Msgf(msg)

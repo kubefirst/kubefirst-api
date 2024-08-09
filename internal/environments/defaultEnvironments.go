@@ -8,7 +8,6 @@ package environments
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,10 +17,10 @@ import (
 
 	"github.com/kubefirst/kubefirst-api/internal/constants"
 	"github.com/kubefirst/kubefirst-api/internal/env"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 	"github.com/kubefirst/kubefirst-api/internal/secrets"
 	"github.com/kubefirst/kubefirst-api/internal/utils"
 	"github.com/kubefirst/kubefirst-api/pkg/types"
-
 	log "github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -47,22 +46,20 @@ func CreateDefaultClusters(mgmtCluster types.Cluster) error {
 		ClusterType:   "workload-vcluster",
 		CloudRegion:   mgmtCluster.CloudRegion,
 		DomainName:    "not so empty string which should be replaced",
-		DnsProvider:   mgmtCluster.DnsProvider,
+		DNSProvider:   mgmtCluster.DNSProvider,
 		Environment: types.Environment{
 			Name:        "not so empty string which should be replaced",
 			Description: "not so empty string which should be replaced",
 		},
 		GitAuth:      mgmtCluster.GitAuth,
 		InstanceSize: "", // left up to terraform
-		NodeType:     "", //left up to terraform
-		NodeCount:    3,  //defaulted here
+		NodeType:     "", // left up to terraform
+		NodeCount:    3,  // defaulted here
 	}
 
 	defaultClusters := []types.WorkloadCluster{}
-
 	kcfg := utils.GetKubernetesClient("TODO: Secrets")
-
-	secrets.CreateSecretReference(kcfg.Clientset, secrets.KUBEFIRST_ENVIRONMENTS_SECRET_NAME, types.SecretListReference{
+	secrets.CreateSecretReference(kcfg.Clientset, secrets.KubefirstEnvironmentSecretName, types.SecretListReference{
 		Name: "environments",
 	})
 
@@ -85,6 +82,7 @@ func CreateDefaultClusters(mgmtCluster types.Cluster) error {
 		vcluster.Environment, err = NewEnvironment(vcluster.Environment)
 		if err != nil {
 			log.Error().Msgf("error creating default environment in db for env %s", err)
+			return fmt.Errorf("error creating default environment in db for environment %q: %w", clusterName, err)
 		}
 		defaultClusters = append(defaultClusters, vcluster)
 	}
@@ -104,7 +102,7 @@ func CreateDefaultClusters(mgmtCluster types.Cluster) error {
 		// Add to list
 		err := secrets.CreateClusterServiceList(kcfg.Clientset, clusterName)
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating cluster service list for cluster %q: %w", clusterName, err)
 		}
 
 		// Update list
@@ -116,65 +114,69 @@ func CreateDefaultClusters(mgmtCluster types.Cluster) error {
 			Links:       []string{fmt.Sprintf("https://metaphor-%s.%s", clusterName, fullDomainName)},
 			Status:      "",
 		})
-
 		if err != nil {
-			return err
+			return fmt.Errorf("error inserting cluster service list entry for cluster %q: %w", clusterName, err)
 		}
 	}
 
 	// call api-ee to create clusters
-	return callApiEE(defaultEnvironmentSet)
+	return callAPIEE(defaultEnvironmentSet)
 }
 
-func callApiEE(goPayload types.WorkloadClusterSet) error {
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	httpClient := http.Client{Transport: customTransport}
-
+func callAPIEE(payload types.WorkloadClusterSet) error {
+	httpClient := httpCommon.CustomHTTPClient(false)
 	env, _ := env.GetEnv(constants.SilenceGetEnv)
 
-	for i, cluster := range goPayload.Clusters {
-
+	for i, cluster := range payload.Clusters {
 		log.Info().Msgf("creating cluster %s for %s", strconv.Itoa(i), cluster.ClusterName)
+
 		payload, err := json.Marshal(cluster)
 		if err != nil {
-			return err
+			return fmt.Errorf("error marshalling cluster %q: %w", cluster.ClusterName, err)
 		}
 
-		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/v1/cluster/%s", env.EnterpriseApiUrl, env.ClusterId), bytes.NewReader(payload))
-
+		endpoint := fmt.Sprintf("%s/api/v1/cluster/%s", env.EnterpriseAPIURL, env.ClusterID)
+		req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(payload))
 		if err != nil {
 			log.Error().Msgf("error creating http request %s", err)
-			return err
+			return fmt.Errorf("error creating http request %q: %w", endpoint, err)
 		}
+
 		req.Header.Add("Content-Type", "application/json")
 		req.Header.Add("Accept", "application/json")
 
-		res, err := httpClient.Do(req)
-		timer := 0
-		for err != nil {
-			if timer > 12 {
-				log.Error().Msgf("error in http call to api ee: api url (%s) did not come up within 2 minutes %s", req.URL, err.Error())
-			} else {
-				res, err = httpClient.Do(req)
+		counter := 0
+		maxTries := 12
+		output := bytes.Buffer{}
+		for {
+			res, err := httpClient.Do(req)
+			if err != nil {
+				if counter > maxTries {
+					log.Error().Msgf("error in http call to API EE: url (%s) did not come up within 2 minutes %s", req.URL, err.Error())
+					return fmt.Errorf("error in http call to API EE: url %q did not come up within 2 minutes: %w", req.URL, err)
+				}
+				counter++
+				time.Sleep(10 * time.Second)
+				continue
 			}
-			timer++
-			time.Sleep(10 * time.Second)
+			defer res.Body.Close()
+
+			if res.StatusCode == http.StatusAccepted {
+				// if we got a 201 but we can't read the page's body,
+				// we still got a cluster, so we should ignore the error
+				io.Copy(&output, res.Body)
+				break
+			}
+
+			// if we get a non-201 status code, we need to retry unless we exceed the counter
+			if counter > maxTries {
+				log.Error().Msgf("unable to create default workload clusters and default environments %s: \n request: %s", res.Status, res.Request.URL)
+				return fmt.Errorf("unable to create default workload clusters and default environments: API returned status %q", res.Status)
+			}
 		}
 
-		if res.StatusCode != http.StatusAccepted {
-			log.Error().Msgf("unable to create default workload clusters and default environments %s: \n request: %s", res.Status, res.Request.URL)
-			return err
-		}
-
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			return err
-		}
-
-		log.Info().Msgf("cluster %s created. result: %s", cluster.ClusterName, string(body))
+		log.Info().Msgf("cluster %q created: details: %s", cluster.ClusterName, output.String())
 		time.Sleep(20 * time.Second)
-
 	}
 	return nil
 }

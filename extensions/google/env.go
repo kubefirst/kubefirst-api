@@ -31,7 +31,7 @@ func readVaultTokenFromSecret(clientset *kubernetes.Clientset) string {
 }
 
 func GetGoogleTerraformEnvs(envs map[string]string, cl *pkgtypes.Cluster) map[string]string {
-	envs["TF_VAR_project"] = cl.GoogleAuth.ProjectId
+	envs["TF_VAR_project"] = cl.GoogleAuth.ProjectID
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal().Msgf("error getting home path: %s", err)
@@ -108,8 +108,7 @@ func GetVaultTerraformEnvs(clientset *kubernetes.Clientset, cl *pkgtypes.Cluster
 	}
 	envs["GOOGLE_APPLICATION_CREDENTIALS"] = fmt.Sprintf("%s/.k1/application-default-credentials.json", homeDir)
 
-	switch cl.GitProvider {
-	case "gitlab":
+	if cl.GitProvider == "gitlab" {
 		envs["TF_VAR_owner_group_id"] = fmt.Sprint(cl.GitlabOwnerGroupID)
 	}
 

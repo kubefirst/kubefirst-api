@@ -14,7 +14,7 @@ import (
 )
 
 // GetKubernetesAssociatedVolumes returns block storage associated with a Vultr Kubernetes cluster
-func (c *VultrConfiguration) GetKubernetesAssociatedBlockStorage(clusterName string, returnAll bool) ([]govultr.BlockStorage, error) {
+func (c *Configuration) GetKubernetesAssociatedBlockStorage(clusterName string, returnAll bool) ([]govultr.BlockStorage, error) {
 	// Probably needs pagination
 	allBlockStorage, _, _, err := c.Client.BlockStorage.List(c.Context, &govultr.ListOptions{})
 	if err != nil {
@@ -73,7 +73,7 @@ func (c *VultrConfiguration) GetKubernetesAssociatedBlockStorage(clusterName str
 }
 
 // DeleteBlockStorage iterates over target volumes and deletes them
-func (c *VultrConfiguration) DeleteBlockStorage(blockStorage []govultr.BlockStorage) error {
+func (c *Configuration) DeleteBlockStorage(blockStorage []govultr.BlockStorage) error {
 	if len(blockStorage) == 0 {
 		return fmt.Errorf("no block storage resources are available for deletion with the provided parameters")
 	}
@@ -90,29 +90,27 @@ func (c *VultrConfiguration) DeleteBlockStorage(blockStorage []govultr.BlockStor
 	return nil
 }
 
-func (c *VultrConfiguration) GetKubeconfig(clusterName string)(string, error) {
+func (c *Configuration) GetKubeconfig(clusterName string) (string, error) {
 	clusters, _, _, err := c.Client.Kubernetes.ListClusters(c.Context, &govultr.ListOptions{})
-
 	if err != nil {
 		return "", err
 	}
 
-	var clusterId string
-	for  _, cluster := range clusters {
+	var clusterID string
+	for _, cluster := range clusters {
 		if cluster.Label == clusterName {
-			clusterId = cluster.ID
+			clusterID = cluster.ID
 			continue
 		}
 	}
 
-	if clusterId == "" {
+	if clusterID == "" {
 		return "", fmt.Errorf("could not find cluster ID for cluster name %s", clusterName)
 	}
 
-	kubeConfig, _, err := c.Client.Kubernetes.GetKubeConfig(c.Context, clusterId)
-
+	kubeConfig, _, err := c.Client.Kubernetes.GetKubeConfig(c.Context, clusterID)
 	if err != nil {
-		return "", err 
+		return "", err
 	}
 
 	return kubeConfig.KubeConfig, nil

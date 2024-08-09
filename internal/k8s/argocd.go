@@ -27,11 +27,11 @@ func VerifyArgoCDReadiness(clientset *kubernetes.Clientset, highAvailabilityEnab
 		timeoutSeconds,
 	)
 	if err != nil {
-		return false, fmt.Errorf("error finding ArgoCD Application Controller StatefulSet: %s", err)
+		return false, fmt.Errorf("error finding ArgoCD Application Controller StatefulSet: %w", err)
 	}
 	_, err = WaitForStatefulSetReady(clientset, argoCDStatefulSet, timeoutSeconds, false)
 	if err != nil {
-		return false, fmt.Errorf("error waiting for ArgoCD Application Controller StatefulSet ready state: %s", err)
+		return false, fmt.Errorf("error waiting for ArgoCD Application Controller StatefulSet ready state: %w", err)
 	}
 
 	// argocd-server Deployment
@@ -44,10 +44,12 @@ func VerifyArgoCDReadiness(clientset *kubernetes.Clientset, highAvailabilityEnab
 	)
 	if err != nil {
 		log.Info().Msgf("Error finding ArgoCD server deployment: %s", err)
+		return false, fmt.Errorf("error finding ArgoCD server deployment: %w", err)
 	}
 	_, err = WaitForDeploymentReady(clientset, argoCDServerDeployment, timeoutSeconds)
 	if err != nil {
 		log.Info().Msgf("Error waiting for ArgoCD server deployment ready state: %s", err)
+		return false, fmt.Errorf("error waiting for ArgoCD server deployment ready state: %w", err)
 	}
 
 	// Wait for additional ArgoCD Pods to transition to Running
@@ -84,7 +86,7 @@ func VerifyArgoCDReadiness(clientset *kubernetes.Clientset, highAvailabilityEnab
 			timeoutSeconds,
 		)
 		if err != nil {
-			return false, fmt.Errorf("error finding ArgoCD argocd-redis-ha-haproxy Deployment: %s", err)
+			return false, fmt.Errorf("error finding ArgoCD argocd-redis-ha-haproxy Deployment: %w", err)
 		}
 		_, err = WaitForDeploymentReady(clientset, argoCDRedisHAhaproxyDeployment, timeoutSeconds)
 		if err != nil {
@@ -117,11 +119,11 @@ func VerifyArgoCDReadiness(clientset *kubernetes.Clientset, highAvailabilityEnab
 			timeoutSeconds,
 		)
 		if err != nil {
-			return false, fmt.Errorf("error finding ArgoCD argocd-redis Deployment: %s", err)
+			return false, fmt.Errorf("error finding ArgoCD argocd-redis Deployment: %w", err)
 		}
 		_, err = WaitForDeploymentReady(clientset, argoCDRedisDeployment, timeoutSeconds)
 		if err != nil {
-			return false, fmt.Errorf("error waiting for ArgoCD argocd-redis Deployment ready state: %s", err)
+			return false, fmt.Errorf("error waiting for ArgoCD argocd-redis Deployment ready state: %w", err)
 		}
 	}
 

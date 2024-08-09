@@ -66,7 +66,7 @@ func (clctrl *ClusterController) RunGitTerraform() error {
 		return err
 	}
 
-	// //* create teams and repositories in github
+	// // * create teams and repositories in github
 
 	telemetry.SendEvent(clctrl.TelemetryEvent, telemetry.GitTerraformApplyStarted, "")
 
@@ -132,7 +132,6 @@ func (clctrl *ClusterController) RunGitTerraform() error {
 
 		clctrl.Cluster.GitTerraformApplyCheck = true
 		err = secrets.UpdateCluster(clctrl.KubernetesClient, clctrl.Cluster)
-
 		if err != nil {
 			return err
 		}
@@ -149,8 +148,7 @@ func (clctrl *ClusterController) GetRepoURL() (string, error) {
 	case "github":
 
 		// Define constant url based on flag input, only expecting 2 protocols
-		switch clctrl.GitProtocol {
-		case "ssh": //"ssh"
+		if clctrl.ProviderConfig.GitProtocol == "ssh" {
 			destinationGitopsRepoURL = clctrl.ProviderConfig.DestinationGitopsRepoGitURL
 		}
 	case "gitlab":
@@ -162,8 +160,8 @@ func (clctrl *ClusterController) GetRepoURL() (string, error) {
 		switch clctrl.ProviderConfig.GitProtocol {
 		case "https":
 			// Update the urls in the cluster for gitlab parent groups
-			clctrl.ProviderConfig.DestinationGitopsRepoHttpsURL = fmt.Sprintf("https://gitlab.com/%s/gitops.git", gitlabClient.ParentGroupPath)
-			clctrl.ProviderConfig.DestinationMetaphorRepoHttpsURL = fmt.Sprintf("https://gitlab.com/%s/metaphor.git", gitlabClient.ParentGroupPath)
+			clctrl.ProviderConfig.DestinationGitopsRepoHTTPSURL = fmt.Sprintf("https://gitlab.com/%s/gitops.git", gitlabClient.ParentGroupPath)
+			clctrl.ProviderConfig.DestinationMetaphorRepoHTTPSURL = fmt.Sprintf("https://gitlab.com/%s/metaphor.git", gitlabClient.ParentGroupPath)
 		default:
 			// Update the urls in the cluster for gitlab parent group
 			clctrl.ProviderConfig.DestinationGitopsRepoGitURL = fmt.Sprintf("git@gitlab.com:%s/gitops.git", gitlabClient.ParentGroupPath)

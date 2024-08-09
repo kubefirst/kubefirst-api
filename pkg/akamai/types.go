@@ -13,12 +13,12 @@ import (
 	"github.com/linode/linodego"
 )
 
-type AkamaiConfiguration struct {
+type Configuration struct {
 	Client  linodego.Client
 	Context context.Context
 }
 
-type AkamaiBucketAndKeysConfiguration struct {
+type BucketAndKeysConfiguration struct {
 	StateStoreDetails     types.StateStoreDetails
 	StateStoreCredentials types.StateStoreCredentials
 }

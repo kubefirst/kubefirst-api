@@ -4,7 +4,7 @@ Copyright (C) 2021-2023, Kubefirst
 This program is licensed under MIT.
 See the LICENSE file for more details.
 */
-package gitClient
+package gitClient //nolint:revive // allowed temporarily during code reorg
 
 import (
 	"fmt"
@@ -21,7 +21,6 @@ import (
 )
 
 func Clone(gitRef, repoLocalPath, repoURL string) (*git.Repository, error) {
-
 	// kubefirst tags do not contain a `v` prefix, to use the library requires the v to be valid
 	isSemVer := semver.IsValid(gitRef)
 
@@ -46,7 +45,6 @@ func Clone(gitRef, repoLocalPath, repoURL string) (*git.Repository, error) {
 }
 
 func ClonePrivateRepo(gitRef string, repoLocalPath string, repoURL string, userName string, token string) (*git.Repository, error) {
-
 	// kubefirst tags do not contain a `v` prefix, to use the library requires the v to be valid
 	isSemVer := semver.IsValid(gitRef)
 
@@ -75,7 +73,6 @@ func ClonePrivateRepo(gitRef string, repoLocalPath string, repoURL string, userN
 }
 
 func CloneRefSetMain(gitRef, repoLocalPath, repoURL string) (*git.Repository, error) {
-
 	log.Info().Msgf("cloning url: %s - git ref: %s", repoURL, gitRef)
 
 	repo, err := Clone(gitRef, repoLocalPath, repoURL)
@@ -93,7 +90,7 @@ func CloneRefSetMain(gitRef, repoLocalPath, repoURL string) (*git.Repository, er
 		// remove old git ref
 		err = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName(gitRef))
 		if err != nil {
-			return nil, fmt.Errorf("error removing previous git ref: %s", err)
+			return nil, fmt.Errorf("error removing previous git ref: %w", err)
 		}
 	}
 	return repo, nil
@@ -105,24 +102,23 @@ func SetRefToMainBranch(repo *git.Repository) (*git.Repository, error) {
 	branchName := plumbing.NewBranchReferenceName("main")
 	headRef, err := repo.Head()
 	if err != nil {
-		return nil, fmt.Errorf("error Setting reference: %s", err)
+		return nil, fmt.Errorf("error Setting reference: %w", err)
 	}
 
 	ref := plumbing.NewHashReference(branchName, headRef.Hash())
 	err = repo.Storer.SetReference(ref)
 	if err != nil {
-		return nil, fmt.Errorf("error Storing reference: %s", err)
+		return nil, fmt.Errorf("error Storing reference: %w", err)
 	}
 
 	err = w.Checkout(&git.CheckoutOptions{Branch: ref.Name()})
 	if err != nil {
-		return nil, fmt.Errorf("error checking out main: %s", err)
+		return nil, fmt.Errorf("error checking out main: %w", err)
 	}
 	return repo, nil
 }
 
 func AddRemote(newGitRemoteURL, remoteName string, repo *git.Repository) error {
-
 	log.Info().Msgf("git remote add %s %s", remoteName, newGitRemoteURL)
 	_, err := repo.CreateRemote(&gitConfig.RemoteConfig{
 		Name: remoteName,
@@ -152,7 +148,6 @@ func Commit(repo *git.Repository, commitMsg string) error {
 			When:  time.Now(),
 		},
 	})
-
 	if err != nil {
 		log.Info().Msgf("error committing in repo: %s", err)
 		return err
@@ -169,7 +164,7 @@ func Pull(repo *git.Repository, remote string, branch string) error {
 		ReferenceName: branchName,
 	})
 	if err != nil {
-		return fmt.Errorf("error during git pull: %s", err)
+		return fmt.Errorf("error during git pull: %w", err)
 	}
 
 	return nil

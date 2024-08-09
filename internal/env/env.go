@@ -3,7 +3,7 @@ package env
 import (
 	env "github.com/caarlos0/env/v10"
 	"github.com/joho/godotenv"
-	log "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/log"
 )
 
 type Env struct {
@@ -11,7 +11,7 @@ type Env struct {
 	K1AccessToken         string `env:"K1_ACCESS_TOKEN"`
 	KubefirstVersion      string `env:"KUBEFIRST_VERSION" envDefault:"main"`
 	CloudProvider         string `env:"CLOUD_PROVIDER"`
-	ClusterId             string `env:"CLUSTER_ID"`
+	ClusterID             string `env:"CLUSTER_ID"`
 	ClusterType           string `env:"CLUSTER_TYPE"`
 	DomainName            string `env:"DOMAIN_NAME"`
 	GitProvider           string `env:"GIT_PROVIDER"`
@@ -21,9 +21,9 @@ type Env struct {
 	AWSRegion             string `env:"AWS_REGION"`
 	AWSProfile            string `env:"AWS_PROFILE"`
 	IsClusterZero         string `env:"IS_CLUSTER_ZERO"`
-	ParentClusterId       string `env:"PARENT_CLUSTER_ID"`
+	ParentClusterID       string `env:"PARENT_CLUSTER_ID"`
 	InCluster             string `env:"IN_CLUSTER" envDefault:"false"`
-	EnterpriseApiUrl      string `env:"ENTERPRISE_API_URL"`
+	EnterpriseAPIURL      string `env:"ENTERPRISE_API_URL"`
 	K1LocalDebug          string `env:"K1_LOCAL_DEBUG"`
 	K1LocalKubeconfigPath string `env:"K1_LOCAL_KUBECONFIG_PATH"`
 }

@@ -1,6 +1,6 @@
 module github.com/kubefirst/kubefirst-api
 
-go 1.20
+go 1.22
 
 require (
 	cloud.google.com/go/compute v1.23.0

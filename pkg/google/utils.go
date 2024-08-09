@@ -15,7 +15,6 @@ import (
 
 // WriteGoogleApplicationCredentialsFile writes credentials file for use throughout installation
 func WriteGoogleApplicationCredentialsFile(googleApplicationCredentials, homeDir string) error {
-
 	file, err := os.Create(fmt.Sprintf("%s/.k1/application-default-credentials.json", homeDir))
 	if err != nil {
 		return err

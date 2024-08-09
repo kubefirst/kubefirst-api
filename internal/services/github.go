@@ -37,11 +37,10 @@ func NewGitHubService(httpClient pkg.HTTPDoer) *GitHubService {
 
 // CheckUserCodeConfirmation checks if the user gave permission to the device flow request
 func (service GitHubService) CheckUserCodeConfirmation(deviceCode string) (string, error) {
-
 	gitHubAccessTokenURL := "https://github.com/login/oauth/access_token"
 
 	jsonData, err := json.Marshal(map[string]string{
-		"client_id":   pkg.GitHubOAuthClientId,
+		"client_id":   pkg.GitHubOAuthClientID,
 		"device_code": deviceCode,
 		"grant_type":  "urn:ietf:params:oauth:grant-type:device_code",
 	})

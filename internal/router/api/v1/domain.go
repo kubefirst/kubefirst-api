@@ -93,14 +93,21 @@ func PostDomains(c *gin.Context) {
 			})
 			return
 		}
-		awsConf := &awsinternal.AWSConfiguration{
-			Config: awsinternal.NewAwsV3(
-				domainListRequest.CloudRegion,
-				domainListRequest.AWSAuth.AccessKeyID,
-				domainListRequest.AWSAuth.SecretAccessKey,
-				domainListRequest.AWSAuth.SessionToken,
-			),
+
+		conf, err := awsinternal.NewAwsV3(
+			domainListRequest.CloudRegion,
+			domainListRequest.AWSAuth.AccessKeyID,
+			domainListRequest.AWSAuth.SecretAccessKey,
+			domainListRequest.AWSAuth.SessionToken,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, types.JSONFailureResponse{
+				Message: fmt.Sprintf("error creating aws client: %v", err),
+			})
+			return
 		}
+
+		awsConf := &awsinternal.Configuration{Config: conf}
 
 		domains, err := awsConf.GetHostedZones()
 		if err != nil {
@@ -111,7 +118,7 @@ func PostDomains(c *gin.Context) {
 		}
 		domainListResponse.Domains = domains
 	case "cloudflare":
-		//check for token, make sure it aint blank
+		// check for token, make sure it aint blank
 		if domainListRequest.CloudflareAuth.APIToken == "" {
 			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 				Message: "missing authentication credentials in request, please check and try again",
@@ -127,7 +134,7 @@ func PostDomains(c *gin.Context) {
 			return
 		}
 
-		cloudflareConf := cloudflare.CloudflareConfiguration{
+		cloudflareConf := cloudflare.Configuration{
 			Client:  client,
 			Context: context.Background(),
 		}
@@ -149,12 +156,12 @@ func PostDomains(c *gin.Context) {
 			})
 			return
 		}
-		civoConf := civo.CivoConfiguration{
+		civoConf := civo.Configuration{
 			Client:  civo.NewCivo(domainListRequest.CivoAuth.Token, domainListRequest.CloudRegion),
 			Context: context.Background(),
 		}
 
-		domains, err := civoConf.GetDNSDomains(domainListRequest.CloudRegion)
+		domains, err := civoConf.GetDNSDomains()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 				Message: err.Error(),
@@ -169,7 +176,7 @@ func PostDomains(c *gin.Context) {
 			})
 			return
 		}
-		digitaloceanConf := digitalocean.DigitaloceanConfiguration{
+		digitaloceanConf := digitalocean.Configuration{
 			Client:  digitalocean.NewDigitalocean(domainListRequest.DigitaloceanAuth.Token),
 			Context: context.Background(),
 		}
@@ -189,7 +196,7 @@ func PostDomains(c *gin.Context) {
 			})
 			return
 		}
-		vultrConf := vultr.VultrConfiguration{
+		vultrConf := vultr.Configuration{
 			Client:  vultr.NewVultr(domainListRequest.VultrAuth.Token),
 			Context: context.Background(),
 		}
@@ -203,16 +210,16 @@ func PostDomains(c *gin.Context) {
 		}
 		domainListResponse.Domains = domains
 	case "google":
-		if domainListRequest.GoogleAuth.ProjectId == "" {
+		if domainListRequest.GoogleAuth.ProjectID == "" {
 			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 				Message: "missing authentication credentials in request, please check and try again",
 			})
 			return
 		}
 
-		googleConf := google.GoogleConfiguration{
+		googleConf := google.Configuration{
 			Context: context.Background(),
-			Project: domainListRequest.GoogleAuth.ProjectId,
+			Project: domainListRequest.GoogleAuth.ProjectID,
 			Region:  domainListRequest.CloudRegion,
 			KeyFile: domainListRequest.GoogleAuth.KeyFile,
 		}

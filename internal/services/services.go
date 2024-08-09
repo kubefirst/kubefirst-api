@@ -7,13 +7,11 @@ See the LICENSE file for more details.
 package services
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	v1alpha1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
@@ -67,12 +65,12 @@ func CreateService(cl *pkgtypes.Cluster, serviceName string, appDef *pkgtypes.Gi
 
 	err = gitShim.PrepareGitEnvironment(cl, tmpGitopsDir)
 	if err != nil {
-		log.Fatal().Msgf("an error ocurred preparing git environment %s %s", tmpGitopsDir, err)
+		log.Fatal().Msgf("an error occurred preparing git environment %s %s", tmpGitopsDir, err)
 	}
 
 	err = gitShim.PrepareGitOpsCatalog(tmpGitopsCatalogDir)
 	if err != nil {
-		log.Fatal().Msgf("an error ocurred preparing gitops catalog environment %s %s", tmpGitopsDir, err)
+		log.Fatal().Msgf("an error occurred preparing gitops catalog environment %s %s", tmpGitopsDir, err)
 	}
 
 	gitopsRepo, _ := git.PlainOpen(tmpGitopsDir)
@@ -105,10 +103,10 @@ func CreateService(cl *pkgtypes.Cluster, serviceName string, appDef *pkgtypes.Gi
 		fullDomainName = cl.DomainName
 	}
 
-	vaultUrl := fmt.Sprintf("https://vault.%s", fullDomainName)
+	vaultURL := fmt.Sprintf("https://vault.%s", fullDomainName)
 
 	if cl.CloudProvider == "k3d" {
-		vaultUrl = "http://vault.vault.svc:8200"
+		vaultURL = "http://vault.vault.svc:8200"
 	}
 
 	// If there are secret values, create a vault secret
@@ -128,7 +126,7 @@ func CreateService(cl *pkgtypes.Cluster, serviceName string, appDef *pkgtypes.Gi
 		}
 
 		vaultClient, err := vaultapi.NewClient(&vaultapi.Config{
-			Address: vaultUrl,
+			Address: vaultURL,
 		})
 		if err != nil {
 			return fmt.Errorf("cluster %s - error initializing vault client: %s", clusterName, err)
@@ -159,16 +157,16 @@ func CreateService(cl *pkgtypes.Cluster, serviceName string, appDef *pkgtypes.Gi
 	}
 
 	if !req.IsTemplate {
-		//Create Tokens
+		// Create Tokens
 		gitopsKubefirstTokens := utils.CreateTokensFromDatabaseRecord(cl, registryPath, secretStoreRef, project, clusterDestination, environment, clusterName)
 
-		//Detokenize App Template
+		// Detokenize App Template
 		err = providerConfigs.DetokenizeGitGitops(catalogServiceFolder, gitopsKubefirstTokens, cl.GitProtocol, cl.CloudflareAuth.OriginCaIssuerKey != "")
 		if err != nil {
 			return fmt.Errorf("cluster %s - error opening file: %s", clusterName, err)
 		}
 
-		//Detokenize Config Keys
+		// Detokenize Config Keys
 		err = DetokenizeConfigKeys(catalogServiceFolder, req.ConfigKeys)
 		if err != nil {
 			return fmt.Errorf("cluster %s - error opening file: %s", clusterName, err)
@@ -241,8 +239,7 @@ func CreateService(cl *pkgtypes.Cluster, serviceName string, appDef *pkgtypes.Gi
 		argoCDHost = "http://argocd-server.argocd.svc.cluster.local"
 	}
 
-	httpClient := http.Client{Timeout: time.Second * 10}
-	argoCDToken, err := argocd.GetArgocdTokenV2(&httpClient, argoCDHost, "admin", cl.ArgoCDPassword)
+	argoCDToken, err := argocd.GetArgocdTokenV2(argoCDHost, "admin", cl.ArgoCDPassword)
 	if err != nil {
 		log.Warn().Msgf("error getting argocd token: %s", err)
 		return err
@@ -318,7 +315,7 @@ func DeleteService(cl *pkgtypes.Cluster, serviceName string, def pkgtypes.Gitops
 
 		err = gitShim.PrepareGitEnvironment(cl, tmpGitopsDir)
 		if err != nil {
-			log.Fatal().Msgf("an error ocurred preparing git environment %s %s", tmpGitopsDir, err)
+			log.Fatal().Msgf("an error occurred preparing git environment %s %s", tmpGitopsDir, err)
 		}
 
 		gitopsRepo, _ = git.PlainOpen(tmpGitopsDir)
@@ -337,7 +334,6 @@ func DeleteService(cl *pkgtypes.Cluster, serviceName string, def pkgtypes.Gitops
 				Password: cl.GitAuth.Token,
 			},
 		)
-
 		if err != nil {
 			log.Warn().Msgf("cluster %s - error pulling gitops repo: %s", clusterName, err)
 		}
@@ -346,22 +342,21 @@ func DeleteService(cl *pkgtypes.Cluster, serviceName string, def pkgtypes.Gitops
 		_, err = os.Stat(serviceFile)
 		if err != nil {
 			return fmt.Errorf("file %s does not exist in repository", serviceFile)
-		} else {
-			err := os.Remove(serviceFile)
-			if err != nil {
-				return fmt.Errorf("cluster %s - error deleting file: %s", clusterName, err)
-			}
 		}
 
-		// removing componentes service folder
+		err := os.Remove(serviceFile)
+		if err != nil {
+			return fmt.Errorf("cluster %s - error deleting file: %s", clusterName, err)
+		}
+
+		// removing components service folder
 		_, err = os.Stat(componentsServiceFolder)
 		if err != nil {
 			return fmt.Errorf("folder %s does not exist in repository", componentsServiceFolder)
-		} else {
-			err := os.RemoveAll(componentsServiceFolder)
-			if err != nil {
-				return fmt.Errorf("cluster %s - error deleting components folder: %s", clusterName, err)
-			}
+		}
+
+		if err := os.RemoveAll(componentsServiceFolder); err != nil {
+			return fmt.Errorf("cluster %s - error deleting components folder: %s", clusterName, err)
 		}
 
 		// Commit to gitops repository
@@ -377,7 +372,6 @@ func DeleteService(cl *pkgtypes.Cluster, serviceName string, def pkgtypes.Gitops
 				Password: cl.GitAuth.Token,
 			},
 		})
-
 		if err != nil {
 			return fmt.Errorf("cluster %s - error pushing commit for service file: %s", clusterName, err)
 		}
@@ -392,7 +386,7 @@ func DeleteService(cl *pkgtypes.Cluster, serviceName string, def pkgtypes.Gitops
 }
 
 // ValidateService
-func ValidateService(cl *pkgtypes.Cluster, serviceName string, def *pkgtypes.GitopsCatalogAppCreateRequest) (error, bool) {
+func ValidateService(cl *pkgtypes.Cluster, serviceName string, def *pkgtypes.GitopsCatalogAppCreateRequest) (bool, error) {
 	canDeleleteService := true
 
 	var gitopsRepo *git.Repository
@@ -410,12 +404,12 @@ func ValidateService(cl *pkgtypes.Cluster, serviceName string, def *pkgtypes.Git
 	err := os.RemoveAll(tmpGitopsDir)
 	if err != nil {
 		log.Fatal().Msgf("error removing gitops dir %s: %s", tmpGitopsDir, err)
-		return err, false
+		return false, err
 	}
 
 	err = gitShim.PrepareGitEnvironment(cl, tmpGitopsDir)
 	if err != nil {
-		log.Fatal().Msgf("an error ocurred preparing git environment %s %s", tmpGitopsDir, err)
+		log.Fatal().Msgf("an error occurred preparing git environment %s %s", tmpGitopsDir, err)
 	}
 
 	gitopsRepo, _ = git.PlainOpen(tmpGitopsDir)
@@ -433,7 +427,6 @@ func ValidateService(cl *pkgtypes.Cluster, serviceName string, def *pkgtypes.Git
 			Password: cl.GitAuth.Token,
 		},
 	)
-
 	if err != nil {
 		log.Warn().Msgf("cluster %s - error pulling gitops repo: %s", clusterName, err)
 	}
@@ -444,7 +437,7 @@ func ValidateService(cl *pkgtypes.Cluster, serviceName string, def *pkgtypes.Git
 		canDeleleteService = false
 	}
 
-	return nil, canDeleleteService
+	return canDeleleteService, nil
 }
 
 // AddDefaultServices
@@ -469,8 +462,10 @@ func AddDefaultServices(cl *pkgtypes.Cluster) error {
 			Default:     true,
 			Description: "The git repositories contain all the Infrastructure as Code and Gitops configurations.",
 			Image:       fmt.Sprintf("https://assets.kubefirst.com/console/%s.svg", cl.GitProvider),
-			Links: []string{fmt.Sprintf("https://%s/%s/gitops", cl.GitHost, cl.GitAuth.Owner),
-				fmt.Sprintf("https://%s/%s/metaphor", cl.GitHost, cl.GitAuth.Owner)},
+			Links: []string{
+				fmt.Sprintf("https://%s/%s/gitops", cl.GitHost, cl.GitAuth.Owner),
+				fmt.Sprintf("https://%s/%s/metaphor", cl.GitHost, cl.GitAuth.Owner),
+			},
 			Status:    "",
 			CreatedBy: "kbot",
 		},
@@ -515,9 +510,11 @@ func AddDefaultServices(cl *pkgtypes.Cluster) error {
 			Default:     true,
 			Description: "A multi-environment demonstration space for frontend application best practices that's easy to apply to other projects.",
 			Image:       "https://assets.kubefirst.com/console/metaphor.svg",
-			Links: []string{fmt.Sprintf("https://metaphor-development.%s", fullDomainName),
+			Links: []string{
+				fmt.Sprintf("https://metaphor-development.%s", fullDomainName),
 				fmt.Sprintf("https://metaphor-staging.%s", fullDomainName),
-				fmt.Sprintf("https://metaphor-production.%s", fullDomainName)},
+				fmt.Sprintf("https://metaphor-production.%s", fullDomainName),
+			},
 			Status:    "",
 			CreatedBy: "kbot",
 		},
@@ -540,16 +537,16 @@ func DetokenizeConfigKeys(serviceFilePath string, configKeys []pkgtypes.GitopsCa
 		}
 
 		if !info.IsDir() {
-			data, err := ioutil.ReadFile(path)
+			data, err := os.ReadFile(path)
 			if err != nil {
 				return err
 			}
 
 			for _, configKey := range configKeys {
-				data = []byte(strings.Replace(string(data), configKey.Name, configKey.Value, -1))
+				data = bytes.ReplaceAll(data, []byte(configKey.Name), []byte(configKey.Value))
 			}
 
-			err = ioutil.WriteFile(path, data, 0)
+			err = os.WriteFile(path, data, 0)
 			if err != nil {
 				return err
 			}
@@ -560,12 +557,12 @@ func DetokenizeConfigKeys(serviceFilePath string, configKeys []pkgtypes.GitopsCa
 
 func getRegistryPath(clusterName string, cloudProvider string, isTemplate bool) string {
 	if isTemplate && cloudProvider != "k3d" {
-		return fmt.Sprintf("templates/%s", clusterName)
+		return filepath.Join("templates", clusterName)
 	}
 
 	if cloudProvider == "k3d" {
-		return fmt.Sprintf("registry/%s", clusterName)
-	} else {
-		return fmt.Sprintf("registry/clusters/%s", clusterName)
+		return filepath.Join("clusters", clusterName)
 	}
+
+	return filepath.Join("registry", "clusters", clusterName)
 }

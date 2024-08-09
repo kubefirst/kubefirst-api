@@ -289,7 +289,7 @@ func PostCreateCluster(c *gin.Context) {
 
 	// Retry mechanism
 	if cluster.ClusterName != "" {
-		//Assign cloud and git credentials
+		// Assign cloud and git credentials
 		clusterDefinition.AkamaiAuth = cluster.AkamaiAuth
 		clusterDefinition.AWSAuth = cluster.AWSAuth
 		clusterDefinition.CivoAuth = cluster.CivoAuth
@@ -306,10 +306,7 @@ func PostCreateCluster(c *gin.Context) {
 
 	env, _ := env.GetEnv(constants.SilenceGetEnv)
 
-	var inCluster bool = false
-	if env.InCluster == "true" {
-		inCluster = true
-	}
+	inCluster := env.InCluster == "true"
 
 	if inCluster {
 		kcfg := utils.GetKubernetesClient("")
@@ -341,14 +338,13 @@ func PostCreateCluster(c *gin.Context) {
 			clusterDefinition.AkamaiAuth = pkgtypes.AkamaiAuth{
 				Token: k1AuthSecret["akamai-token"],
 			}
-		} else {
-			if clusterDefinition.AkamaiAuth.Token == "" {
-				c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
-					Message: "missing authentication credentials in request, please check and try again",
-				})
-				return
-			}
+		} else if clusterDefinition.AkamaiAuth.Token == "" {
+			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
+				Message: "missing authentication credentials in request, please check and try again",
+			})
+			return
 		}
+
 		go func() {
 			err = akamai.CreateAkamaiCluster(&clusterDefinition)
 			if err != nil {
@@ -373,15 +369,13 @@ func PostCreateCluster(c *gin.Context) {
 				SecretAccessKey: k1AuthSecret["aws-secret-access-key"],
 				SessionToken:    k1AuthSecret["aws-session-token"],
 			}
-		} else {
-			if clusterDefinition.AWSAuth.AccessKeyID == "" ||
-				clusterDefinition.AWSAuth.SecretAccessKey == "" ||
-				clusterDefinition.AWSAuth.SessionToken == "" {
-				c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
-					Message: "missing authentication credentials in request, please check and try again",
-				})
-				return
-			}
+		} else if clusterDefinition.AWSAuth.AccessKeyID == "" ||
+			clusterDefinition.AWSAuth.SecretAccessKey == "" ||
+			clusterDefinition.AWSAuth.SessionToken == "" {
+			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
+				Message: "missing authentication credentials in request, please check and try again",
+			})
+			return
 		}
 		go func() {
 			err = aws.CreateAWSCluster(&clusterDefinition)
@@ -405,14 +399,13 @@ func PostCreateCluster(c *gin.Context) {
 			clusterDefinition.CivoAuth = pkgtypes.CivoAuth{
 				Token: k1AuthSecret["civo-token"],
 			}
-		} else {
-			if clusterDefinition.CivoAuth.Token == "" {
-				c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
-					Message: "missing authentication credentials in request, please check and try again",
-				})
-				return
-			}
+		} else if clusterDefinition.CivoAuth.Token == "" {
+			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
+				Message: "missing authentication credentials in request, please check and try again",
+			})
+			return
 		}
+
 		go func() {
 			err = civo.CreateCivoCluster(&clusterDefinition)
 			if err != nil {
@@ -437,16 +430,15 @@ func PostCreateCluster(c *gin.Context) {
 				SpacesKey:    k1AuthSecret["do-spaces-key"],
 				SpacesSecret: k1AuthSecret["do-spaces-token"],
 			}
-		} else {
-			if clusterDefinition.DigitaloceanAuth.Token == "" ||
-				clusterDefinition.DigitaloceanAuth.SpacesKey == "" ||
-				clusterDefinition.DigitaloceanAuth.SpacesSecret == "" {
-				c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
-					Message: "missing authentication credentials in request, please check and try again",
-				})
-				return
-			}
+		} else if clusterDefinition.DigitaloceanAuth.Token == "" ||
+			clusterDefinition.DigitaloceanAuth.SpacesKey == "" ||
+			clusterDefinition.DigitaloceanAuth.SpacesSecret == "" {
+			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
+				Message: "missing authentication credentials in request, please check and try again",
+			})
+			return
 		}
+
 		go func() {
 			err = digitalocean.CreateDigitaloceanCluster(&clusterDefinition)
 			if err != nil {
@@ -469,14 +461,13 @@ func PostCreateCluster(c *gin.Context) {
 			clusterDefinition.VultrAuth = pkgtypes.VultrAuth{
 				Token: k1AuthSecret["vultr-api-key"],
 			}
-		} else {
-			if clusterDefinition.VultrAuth.Token == "" {
-				c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
-					Message: "missing authentication credentials in request, please check and try again",
-				})
-				return
-			}
+		} else if clusterDefinition.VultrAuth.Token == "" {
+			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
+				Message: "missing authentication credentials in request, please check and try again",
+			})
+			return
 		}
+
 		go func() {
 			err = vultr.CreateVultrCluster(&clusterDefinition)
 			if err != nil {
@@ -498,16 +489,15 @@ func PostCreateCluster(c *gin.Context) {
 			}
 			clusterDefinition.GoogleAuth = pkgtypes.GoogleAuth{
 				KeyFile:   k1AuthSecret["KeyFile"],
-				ProjectId: k1AuthSecret["ProjectId"],
+				ProjectID: k1AuthSecret["ProjectId"],
 			}
-		} else {
-			if clusterDefinition.GoogleAuth.KeyFile == "" {
-				c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
-					Message: "missing authentication credentials in request, please check and try again",
-				})
-				return
-			}
+		} else if clusterDefinition.GoogleAuth.KeyFile == "" {
+			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
+				Message: "missing authentication credentials in request, please check and try again",
+			})
+			return
 		}
+
 		go func() {
 			err = google.CreateGoogleCluster(&clusterDefinition)
 			if err != nil {
@@ -537,21 +527,20 @@ func PostCreateCluster(c *gin.Context) {
 			clusterDefinition.K3sAuth = pkgtypes.K3sAuth{
 				K3sServersPrivateIps: strings.Split(k1AuthSecret["servers-private-ips"], ","),
 				K3sServersPublicIps:  defaultK3sServersPublicIps,
-				K3sSshUser:           k1AuthSecret["ssh-user"],
-				K3sSshPrivateKey:     k1AuthSecret["ssh-privatekey"],
+				K3sSSHUser:           k1AuthSecret["ssh-user"],
+				K3sSSHPrivateKey:     k1AuthSecret["ssh-privatekey"],
 				K3sServersArgs:       strings.Split(k1AuthSecret["servers-args"], ","),
 			}
-		} else {
-			if len(clusterDefinition.K3sAuth.K3sServersPrivateIps) == 0 ||
-				clusterDefinition.K3sAuth.K3sSshUser == "" ||
-				clusterDefinition.K3sAuth.K3sSshPrivateKey == "" {
-				c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
-					// Message: "missing authentication credentials in request, please check and try again",
-					Message: fmt.Sprintf("missing authentication credentials in request, please check and try again: %v", clusterDefinition.K3sAuth),
-				})
-				return
-			}
+		} else if len(clusterDefinition.K3sAuth.K3sServersPrivateIps) == 0 ||
+			clusterDefinition.K3sAuth.K3sSSHUser == "" ||
+			clusterDefinition.K3sAuth.K3sSSHPrivateKey == "" {
+			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
+				// Message: "missing authentication credentials in request, please check and try again",
+				Message: fmt.Sprintf("missing authentication credentials in request, please check and try again: %v", clusterDefinition.K3sAuth),
+			})
+			return
 		}
+
 		go func() {
 			err = k3s.CreateK3sCluster(&clusterDefinition)
 			if err != nil {
@@ -602,7 +591,6 @@ func GetExportCluster(c *gin.Context) {
 }
 
 func GetClusterKubeConfig(c *gin.Context) {
-
 	cloudProvider, param := c.Params.Get("cloud_provider")
 	if !param {
 		c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
@@ -627,13 +615,6 @@ func GetClusterKubeConfig(c *gin.Context) {
 
 	// Handle virtual cluster kubeconfig
 	if VCluster {
-		if err != nil {
-			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
-				Message: "error finding home directory",
-			})
-			return
-		}
-
 		if kubeConfigRequest.ManagClusterName == "" {
 			c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 				Message: "missing man_cluster_name",
@@ -683,7 +664,7 @@ func GetClusterKubeConfig(c *gin.Context) {
 			return
 		}
 
-		civoConfig := civoruntime.CivoConfiguration{
+		civoConfig := civoruntime.Configuration{
 			Client:  civoruntime.NewCivo(kubeConfigRequest.CivoAuth.Token, kubeConfigRequest.CloudRegion),
 			Context: context.Background(),
 		}
@@ -701,7 +682,7 @@ func GetClusterKubeConfig(c *gin.Context) {
 		})
 
 	case "digitalocean":
-		digitaloceanConf := digioceanruntime.DigitaloceanConfiguration{
+		digitaloceanConf := digioceanruntime.Configuration{
 			Client:  digioceanruntime.NewDigitalocean(kubeConfigRequest.DigitaloceanAuth.Token),
 			Context: context.Background(),
 		}
@@ -720,7 +701,7 @@ func GetClusterKubeConfig(c *gin.Context) {
 
 	case "vultr":
 
-		vultrConf := vultrruntime.VultrConfiguration{
+		vultrConf := vultrruntime.Configuration{
 			Client:  vultrruntime.NewVultr(kubeConfigRequest.VultrAuth.Token),
 			Context: context.Background(),
 		}
@@ -743,7 +724,6 @@ func GetClusterKubeConfig(c *gin.Context) {
 		})
 		return
 	}
-	return
 }
 
 // PostImportCluster godoc

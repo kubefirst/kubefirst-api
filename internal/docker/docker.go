@@ -25,7 +25,7 @@ func NewDockerClient() *client.Client {
 	return cli
 }
 
-func (docker DockerClientWrapper) ListContainers() {
+func (docker ClientWrapper) ListContainers() {
 	containers, err := docker.Client.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
 		log.Error().Msg(err.Error())
@@ -37,11 +37,11 @@ func (docker DockerClientWrapper) ListContainers() {
 }
 
 // CheckDockerReady
-func (docker DockerClientWrapper) CheckDockerReady() (bool, error) {
+func (docker ClientWrapper) CheckDockerReady() (bool, error) {
 	_, err := docker.Client.Info(context.Background())
 	if err != nil {
 		log.Error().Msgf("error determining docker readiness: %s", err)
-		return false, err
+		return false, fmt.Errorf("error determining docker readiness: %s", err)
 	}
 
 	return true, nil

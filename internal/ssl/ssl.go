@@ -9,12 +9,11 @@ package ssl
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
-	//cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	//cm "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
+	// cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	// cm "github.com/cert-manager/cert-manager/pkg/client/clientset/versioned"
 	"github.com/rs/zerolog/log"
 
 	pkg "github.com/kubefirst/kubefirst-api/internal"
@@ -24,9 +23,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func Restore(backupDir, domainName, kubeconfigPath string) error {
-
-	sslSecretFiles, err := ioutil.ReadDir(backupDir + "/secrets")
+func Restore(backupDir, kubeconfigPath string) error {
+	sslSecretFiles, err := os.ReadDir(backupDir + "/secrets")
 	if err != nil {
 		return err
 	}
@@ -37,7 +35,6 @@ func Restore(backupDir, domainName, kubeconfigPath string) error {
 	}
 
 	for _, secret := range sslSecretFiles {
-
 		// file is named with convention $namespace-$secretName.yaml
 		//  todo link to backup source code
 		namespace := strings.Split(secret.Name(), "-")[0]
@@ -64,14 +61,13 @@ func Restore(backupDir, domainName, kubeconfigPath string) error {
 	return nil
 }
 
-func Backup(backupDir, domainName, k1Dir, kubeconfigPath string) error {
-
+func Backup(backupDir, kubeconfigPath string) error {
 	clientset, err := k8s.GetClientSet(kubeconfigPath)
 	if err != nil {
 		return err
 	}
 
-	//* corev1 secret resources
+	// * corev1 secret resources
 	secrets, err := clientset.CoreV1().Secrets("").List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -95,10 +91,9 @@ func Backup(backupDir, domainName, k1Dir, kubeconfigPath string) error {
 			log.Info().Msgf("writing file: %s\n\n", fileName)
 			yamlContent, err := yaml.Marshal(secret)
 			if err != nil {
-				return fmt.Errorf("unable to marshal yaml: %s", err)
+				return fmt.Errorf("unable to marshal yaml: %w", err)
 			}
 			pkg.CreateFile(fileName, yamlContent)
-
 		} else {
 			log.Info().Msgf("skipping secret: %s", secret.Name)
 		}

@@ -4,14 +4,14 @@ Copyright (C) 2021-2023, Kubefirst
 This program is licensed under MIT.
 See the LICENSE file for more details.
 */
-package providerConfigs
+package providerConfigs //nolint:revive // allowed during refactoring
 
 type GitopsDirectoryValues struct {
 	AlertsEmail                    string
 	AtlantisAllowList              string
 	CloudProvider                  string
 	CloudRegion                    string
-	ClusterId                      string
+	ClusterID                      string
 	ClusterName                    string
 	ClusterType                    string
 	ContainerRegistryURL           string
@@ -47,7 +47,7 @@ type GitopsDirectoryValues struct {
 	Environment                    string
 
 	AwsIamArnAccountRoot string
-	AwsKmsKeyId          string
+	AwsKmsKeyID          string
 	AwsNodeCapacityType  string
 	AwsAccountID         string
 
@@ -59,8 +59,8 @@ type GitopsDirectoryValues struct {
 	K3sServersPrivateIps []string
 	K3sServersPublicIps  []string
 	K3sServersArgs       []string
-	SshUser              string
-	SshPrivateKey        string
+	SSHUser              string
+	SSHPrivateKey        string
 
 	GitDescription       string
 	GitNamespace         string

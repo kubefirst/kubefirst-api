@@ -8,6 +8,7 @@ package credentials
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -29,7 +30,7 @@ func EvalAuth(expectedCloudProvider string, expectedGitProvider string) (bool, e
 
 	switch {
 	case flags.CloudProvider == "" || flags.GitProvider == "":
-		return false, fmt.Errorf("could not parse cloud and git provider information from config")
+		return false, errors.New("could not parse cloud and git provider information from config")
 	case flags.CloudProvider != expectedCloudProvider:
 		return false, fmt.Errorf("it looks like the current deployed platform is %s - try running this command for that provider", flags.CloudProvider)
 	}
@@ -40,7 +41,7 @@ func EvalAuth(expectedCloudProvider string, expectedGitProvider string) (bool, e
 }
 
 // ParseAuthData gets base root credentials for platform components
-func ParseAuthData(clientset *kubernetes.Clientset, cloudProvider string, gitProvider string, domainName string, opts *CredentialOptions) error {
+func ParseAuthData(clientset *kubernetes.Clientset, cloudProvider string, domainName string, opts *CredentialOptions) error {
 	// Retrieve vault root token
 	var vaultRootToken string
 	vaultUnsealSecretData, err := k8s.ReadSecretV2(clientset, "vault", "vault-unseal-secret")
@@ -64,17 +65,17 @@ func ParseAuthData(clientset *kubernetes.Clientset, cloudProvider string, gitPro
 	// Retrieve kbot password
 	var kbotPassword string
 	if vaultRootToken != "" {
-		vaultUrl := fmt.Sprintf("https://vault.%s", domainName)
-		vaultResolves := httpCommon.ResolveAddress(vaultUrl)
+		vaultURL := fmt.Sprintf("https://vault.%s", domainName)
+		vaultResolves := httpCommon.ResolveAddress(vaultURL)
 
 		if vaultResolves == nil {
 			if vaultRootToken == "" {
 				fmt.Println("Cannot retrieve Vault token automatically. Please provide one here:")
 				fmt.Scanln(&vaultRootToken)
 			}
-			vault := vault.VaultConfiguration{}
+			vault := vault.Configuration{}
 			kbotPassword, err = vault.GetUserPassword(
-				vaultUrl,
+				vaultURL,
 				vaultRootToken,
 				"kbot",
 				"initial-password",
@@ -165,12 +166,11 @@ func printAuthData(messageHeader string, params map[string]string) string {
 	createAuthData.WriteString("\n\n")
 
 	if len(params) == 0 {
-		createAuthData.WriteString("No credentials were retrived.")
+		createAuthData.WriteString("No credentials were retrieved.")
 	}
 	for object, auth := range params {
 		createAuthData.WriteString(fmt.Sprintf("%s: %s\n\n", object, auth))
 	}
 
 	return createAuthData.String()
-
 }

@@ -22,11 +22,15 @@ This is an initial implementation of Config. Please keep in mind we're still wor
 environment variables and general config data.
 */
 
-const DefaultK1Version = "development"
-const DefaultGitOpsTemplateBranch = "main"
+const (
+	DefaultK1Version            = "development"
+	DefaultGitOpsTemplateBranch = "main"
+)
 
 // K1Version is used on version command. The value is dynamically updated on build time via ldflag. Built Kubefirst
 // versions will follow semver value like 1.9.0, when not using the built version, "development" is used.
+//
+//nolint:gochecknoglobals // used to store the version of the built binary
 var K1Version = DefaultK1Version
 
 // Config host application configuration
@@ -206,7 +210,7 @@ func ReadConfig() *Config {
 	// AWS SDK client will take it in advance
 	err = os.Setenv("AWS_SDK_LOAD_CONFIG", "1")
 	if err != nil {
-		log.Error().Msgf("unable to set AWS_SDK_LOAD_CONFIG enviroment value, error is: %v", err)
+		log.Error().Msgf("unable to set AWS_SDK_LOAD_CONFIG environment value, error is: %v", err)
 	}
 
 	return &config

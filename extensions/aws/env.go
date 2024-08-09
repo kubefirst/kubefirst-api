@@ -39,7 +39,7 @@ func GetAwsTerraformEnvs(envs map[string]string, cl *pkgtypes.Cluster) map[strin
 	envs["TF_VAR_aws_session_token"] = cl.AWSAuth.SessionToken
 	envs["TF_VAR_aws_region"] = cl.CloudRegion
 	envs["TF_VAR_hosted_zone_name"] = cl.DomainName
-	//envs["TF_LOG"] = "debug"
+	// envs["TF_LOG"] = "debug"
 
 	return envs
 }
@@ -103,8 +103,7 @@ func GetVaultTerraformEnvs(clientset *kubernetes.Clientset, cl *pkgtypes.Cluster
 	envs["TF_VAR_kbot_ssh_private_key"] = cl.GitAuth.PrivateKey
 	envs["TF_VAR_kbot_ssh_public_key"] = cl.GitAuth.PublicKey
 
-	switch cl.GitProvider {
-	case "gitlab":
+	if cl.GitProvider == "gitlab" {
 		envs["TF_VAR_owner_group_id"] = fmt.Sprint(cl.GitlabOwnerGroupID)
 	}
 

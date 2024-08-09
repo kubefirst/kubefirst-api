@@ -21,68 +21,64 @@ import (
 // in a bash shell to set environment variables
 //
 // If the argument at fileName is an existing file, it will be removed
-func (conf *VaultConfiguration) IterSecrets(
-	endpoint string,
-	token string,
-	fileName string,
-) error {
+func (conf *Configuration) IterSecrets(endpoint, token, fileName string) error {
 	_, err := os.Stat(fileName)
 	if err != nil {
 		log.Info().Msgf("file %s does not exist, continuing", fileName)
 	} else {
-		err := os.Remove(fileName)
-		if err != nil {
-			return fmt.Errorf("error deleting file: %s", err)
+		if err := os.Remove(fileName); err != nil {
+			return fmt.Errorf("error deleting file %q: %w", fileName, err)
 		}
 	}
 
-	result := make([]map[string]interface{}, 0)
-
 	conf.Config.Address = endpoint
 
-	vaultClient, err := vaultapi.NewClient(&conf.Config)
+	vaultClient, err := vaultapi.NewClient(conf.Config)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating vault client: %w", err)
 	}
+
 	vaultClient.SetToken(token)
 	if strings.Contains(endpoint, "http://") {
 		vaultClient.CloneConfig().ConfigureTLS(&vaultapi.TLSConfig{
 			Insecure: true,
 		})
 	}
+
 	log.Info().Msg("created vault client")
 
 	secretsToUse := []string{"atlantis"}
-
+	result := make([]map[string]interface{}, 0)
 	for _, s := range secretsToUse {
 		resp, err := vaultClient.KVv2("secret").Get(context.Background(), s)
 		if err != nil {
-			return err
+			return fmt.Errorf("error getting secret %q: %w", s, err)
 		}
+
 		result = append(result, resp.Data)
 	}
 
-	_, err = os.Create(fileName)
-	if err != nil {
-		return fmt.Errorf("error creating file: %s", err)
+	if _, err := os.Create(fileName); err != nil {
+		return fmt.Errorf("error creating file %q: %w", fileName, err)
 	}
-	f, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	f, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return fmt.Errorf("error opening file: %s", err)
+		return fmt.Errorf("error opening file %q: %w", fileName, err)
 	}
 	defer f.Close()
 
 	for _, m := range result {
 		for k, v := range m {
 			if k == "VAULT_ADDR" {
-				_, err = f.WriteString(fmt.Sprintf("export %s=\"%v\"\n", k, endpoint))
+				_, err = f.WriteString(fmt.Sprintf("export %s=%q\n", k, endpoint))
 				if err != nil {
-					return fmt.Errorf("error writing to file: %s", err)
+					return fmt.Errorf("error writing to file: %w", err)
 				}
 			} else {
-				_, err = f.WriteString(fmt.Sprintf("export %s=\"%v\"\n", k, strings.TrimSuffix(v.(string), "\n")))
+				_, err = f.WriteString(fmt.Sprintf("export %s=%q\n", k, strings.TrimSuffix(v.(string), "\n")))
 				if err != nil {
-					return fmt.Errorf("error writing to file: %s", err)
+					return fmt.Errorf("error writing to file: %w", err)
 				}
 			}
 		}

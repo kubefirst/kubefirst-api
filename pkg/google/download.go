@@ -53,7 +53,7 @@ func DownloadTools(
 			return
 		}
 
-		err = os.Chmod(kubectlClientPath, 0755)
+		err = os.Chmod(kubectlClientPath, 0o755)
 		if err != nil {
 			errorChannel <- err
 			return
@@ -87,13 +87,13 @@ func DownloadTools(
 
 		downloadManager.Unzip(terraformDownloadZipPath, toolsDirPath)
 
-		err = os.Chmod(toolsDirPath, 0777)
+		err = os.Chmod(toolsDirPath, 0o777)
 		if err != nil {
 			errorChannel <- err
 			return
 		}
 
-		err = os.Chmod(fmt.Sprintf("%s/terraform", toolsDirPath), 0755)
+		err = os.Chmod(fmt.Sprintf("%s/terraform", toolsDirPath), 0o755)
 		if err != nil {
 			errorChannel <- err
 			return

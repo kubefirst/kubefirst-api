@@ -4,11 +4,12 @@ Copyright (C) 2021-2023, Kubefirst
 This program is licensed under MIT.
 See the LICENSE file for more details.
 */
-package providerConfigs
+package providerConfigs //nolint:revive,stylecheck // allowing temporarily for better code organization
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -16,10 +17,92 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	pkg "github.com/kubefirst/kubefirst-api/internal"
 	"github.com/kubefirst/kubefirst-api/internal/gitClient"
-
 	cp "github.com/otiai10/copy"
 	"github.com/rs/zerolog/log"
 )
+
+const (
+	AkamaiGitHub       = "akamai-github"
+	AwsGitHub          = "aws-github"
+	AwsGitLab          = "aws-gitlab"
+	CivoGitHub         = "civo-github"
+	CivoGitLab         = "civo-gitlab"
+	GoogleGitHub       = "google-github"
+	GoogleGitLab       = "google-gitlab"
+	DigitalOceanGitHub = "digitalocean-github"
+	DigitalOceanGitLab = "digitalocean-gitlab"
+	VultrGitHub        = "vultr-github"
+	VultrGitLab        = "vultr-gitlab"
+	K3sGitHub          = "k3s-github"
+	K3sGitLab          = "k3s-gitlab"
+)
+
+func removeAllWithLogger(path string) {
+	if err := os.RemoveAll(path); err != nil {
+		// allowing the skip of errors here
+		log.Error().Msgf("Error removing %q from filesystem: %s", path, err.Error())
+	}
+}
+
+func adjustGitOpsRepoForProvider(cloudProvider, gitProvider, gitopsRepoDir, clusterType, clusterName string, apexContentExists, isK3D bool) error {
+	opt := cp.Options{
+		Skip: func(src string) (bool, error) {
+			if strings.HasSuffix(src, ".git") {
+				return true, nil
+			} else if strings.Index(src, "/.terraform") > 0 {
+				return true, nil
+			}
+			// Add more stuff to be ignored here
+			return false, nil
+		},
+	}
+	driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
+
+	if err := cp.Copy(driverContent, gitopsRepoDir, opt); err != nil {
+		log.Error().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
+		return fmt.Errorf("error populating gitops repository with driver content: %s. error: %w", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err)
+	}
+
+	if err := os.RemoveAll(driverContent); err != nil {
+		log.Error().Msgf("Error removing %q from filesystem: %s", driverContent, err.Error())
+		return fmt.Errorf("error removing %q from filesystem: %w", driverContent, err)
+	}
+
+	// * copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
+	clusterContent := filepath.Join(gitopsRepoDir, "templates", clusterType)
+
+	// Remove apex content if apex content already exists
+	if apexContentExists {
+		log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
+		if err := os.Remove(filepath.Join(clusterContent, "nginx-apex.yaml")); err != nil {
+			log.Error().Msgf("Error removing %q from filesystem: %s", filepath.Join(clusterContent, "nginx-apex.yaml"), err.Error())
+			return fmt.Errorf("error removing %q from filesystem: %w", filepath.Join(clusterContent, "nginx-apex.yaml"), err)
+		}
+		if err := os.RemoveAll(filepath.Join(clusterContent, "nginx-apex")); err != nil {
+			log.Error().Msgf("Error removing %q from filesystem: %s", filepath.Join(clusterContent, "nginx-apex"), err.Error())
+			return fmt.Errorf("error removing %q from filesystem: %w", filepath.Join(clusterContent, "nginx-apex"), err)
+		}
+	} else {
+		log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
+	}
+
+	location := filepath.Join(gitopsRepoDir, "registry", "clusters", clusterName)
+	if isK3D {
+		location = filepath.Join(gitopsRepoDir, "registry", clusterName)
+	}
+
+	if err := cp.Copy(clusterContent, location, opt); err != nil {
+		log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
+		return fmt.Errorf("error populating cluster content with %s: %w", clusterContent, err)
+	}
+
+	if err := os.RemoveAll(filepath.Join(gitopsRepoDir, "templates", "mgmt")); err != nil {
+		log.Error().Msgf("Error removing %q from filesystem: %s", filepath.Join(gitopsRepoDir, "templates", "mgmt"), err.Error())
+		return fmt.Errorf("error removing %q from filesystem: %w", filepath.Join(gitopsRepoDir, "templates", "mgmt"), err)
+	}
+
+	return nil
+}
 
 // AdjustGitopsRepo
 func AdjustGitopsRepo(
@@ -28,18 +111,61 @@ func AdjustGitopsRepo(
 	clusterType string,
 	gitopsRepoDir string,
 	gitProvider string,
-	k1Dir string,
 	apexContentExists bool,
 	useCloudflareOriginIssuer bool,
 ) error {
-	//* clean up all other platforms
+	// * clean up all other platforms
 	for _, platform := range pkg.SupportedPlatforms {
 		if platform != fmt.Sprintf("%s-%s", cloudProvider, gitProvider) {
-			os.RemoveAll(gitopsRepoDir + "/" + platform)
+			removeAllWithLogger(filepath.Join(gitopsRepoDir, platform))
 		}
 	}
 
-	//* copy options
+	if !useCloudflareOriginIssuer {
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/cloudflare-origin-ca-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/cloudflare-origin-issuer-crd.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/argo-workflows/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/argocd/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/atlantis/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/chartmuseum/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/kubefirst/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/vault/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-cluster/cloudflare-origin-issuer", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-cluster/40-cloudflare-origin-issuer-crd.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-cluster/41-cloudflare-origin-ca-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-cluster/45-cloudflare-origin-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/cloudflare-origin-issuer", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/40-cloudflare-origin-issuer-crd.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/41-cloudflare-origin-ca-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/45-cloudflare-origin-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+	}
+
+	cloudAndGitProvider := strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider))
+
+	switch cloudAndGitProvider {
+	case AkamaiGitHub,
+		AwsGitHub,
+		AwsGitLab,
+		CivoGitHub,
+		CivoGitLab,
+		GoogleGitHub,
+		GoogleGitLab,
+		DigitalOceanGitHub,
+		DigitalOceanGitLab,
+		VultrGitHub,
+		VultrGitLab,
+		K3sGitHub,
+		K3sGitLab:
+		return adjustGitOpsRepoForProvider(cloudProvider, gitProvider, gitopsRepoDir, clusterType, clusterName, apexContentExists, false)
+
+	default:
+		return adjustGitOpsRepoForProvider(cloudProvider, gitProvider, gitopsRepoDir, clusterType, clusterName, apexContentExists, true)
+	}
+}
+
+func copyContents(source, destination string, createPath bool) error {
 	opt := cp.Options{
 		Skip: func(src string) (bool, error) {
 			if strings.HasSuffix(src, ".git") {
@@ -52,539 +178,19 @@ func AdjustGitopsRepo(
 		},
 	}
 
-	if !useCloudflareOriginIssuer {
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/cloudflare-origin-ca-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/cloudflare-origin-issuer-crd.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/argo-workflows/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/argocd/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/atlantis/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/chartmuseum/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/kubefirst/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/mgmt/components/vault/cloudflareissuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-cluster/cloudflare-origin-issuer", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-cluster/40-cloudflare-origin-issuer-crd.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-cluster/41-cloudflare-origin-ca-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-cluster/45-cloudflare-origin-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/cloudflare-origin-issuer", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/40-cloudflare-origin-issuer-crd.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/41-cloudflare-origin-ca-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
-		os.RemoveAll(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/45-cloudflare-origin-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+	if createPath {
+		target := filepath.Dir(destination)
+		if err := os.MkdirAll(target, 0o700); err != nil {
+			log.Error().Msgf("Error creating directory at %s. error: %s", target, err.Error())
+			return fmt.Errorf("error creating directory at %s: %w", target, err)
+		}
 	}
 
-	AKAMAI_GITHUB := "akamai-github" //! i know i know i know.
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == AKAMAI_GITHUB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == AKAMAI_GITHUB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
+	log.Info().Msgf("copying %q to %q", source, destination)
+	if err := cp.Copy(source, destination, opt); err != nil {
+		log.Error().Msgf("unable to copy %q to %q: %s", source, destination, err.Error())
+		return fmt.Errorf("error copying %q to %q: %w", source, destination, err)
 	}
-
-	AWS_GITHUB := "aws-github"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == AWS_GITHUB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == AWS_GITHUB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	AWS_GITLAB := "aws-gitlab"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == AWS_GITLAB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == AWS_GITLAB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	CIVO_GITHUB := "civo-github" //! i know i know i know.
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == CIVO_GITHUB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == CIVO_GITHUB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	CIVO_GITLAB := "civo-gitlab"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == CIVO_GITLAB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == CIVO_GITLAB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-	GOOGLE_GITHUB := "google-github"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == GOOGLE_GITHUB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == GOOGLE_GITHUB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	GOOGLE_GITLAB := "google-gitlab"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == GOOGLE_GITLAB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == GOOGLE_GITLAB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	DIGITALOCEAN_GITHUB := "digitalocean-github"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == DIGITALOCEAN_GITHUB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == DIGITALOCEAN_GITHUB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	DIGITALOCEAN_GITLAB := "digitalocean-gitlab"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == DIGITALOCEAN_GITLAB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == DIGITALOCEAN_GITLAB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	VULTR_GITHUB := "vultr-github"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == VULTR_GITHUB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == VULTR_GITHUB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	VULTR_GITLAB := "vultr-gitlab"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == VULTR_GITLAB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == VULTR_GITLAB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	K3S_GITLAB := "k3s-gitlab"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == K3S_GITLAB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == K3S_GITLAB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	K3S_GITHUB := "k3s-github"
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == K3S_GITHUB {
-		driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-		err := cp.Copy(driverContent, gitopsRepoDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-			return err
-		}
-		os.RemoveAll(driverContent)
-
-		//* copy $HOME/.k1/gitops/templates/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-		clusterContent := fmt.Sprintf("%s/templates/%s", gitopsRepoDir, clusterType)
-
-		// Remove apex content if apex content already exists
-		if apexContentExists {
-			log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-			os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-			os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-		} else {
-			log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-		}
-
-		if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == K3S_GITHUB {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-		} else {
-			err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-		}
-		if err != nil {
-			log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-			return err
-		}
-		os.RemoveAll(fmt.Sprintf("%s/templates/mgmt", gitopsRepoDir))
-
-		return nil
-	}
-
-	//* copy $cloudProvider-$gitProvider/* $HOME/.k1/gitops/
-	driverContent := fmt.Sprintf("%s/%s-%s/", gitopsRepoDir, cloudProvider, gitProvider)
-	err := cp.Copy(driverContent, gitopsRepoDir, opt)
-	if err != nil {
-		log.Info().Msgf("Error populating gitops repository with driver content: %s. error: %s", fmt.Sprintf("%s-%s", cloudProvider, gitProvider), err.Error())
-		return err
-	}
-	os.RemoveAll(driverContent)
-
-	//* copy $HOME/.k1/gitops/cluster-types/${clusterType}/* $HOME/.k1/gitops/registry/${clusterName}
-	clusterContent := fmt.Sprintf("%s/cluster-types/%s", gitopsRepoDir, clusterType)
-
-	// Remove apex content if apex content already exists
-	if apexContentExists {
-		log.Warn().Msgf("removing nginx-apex since apexContentExists was %v", apexContentExists)
-		os.Remove(fmt.Sprintf("%s/nginx-apex.yaml", clusterContent))
-		os.RemoveAll(fmt.Sprintf("%s/nginx-apex", clusterContent))
-	} else {
-		log.Warn().Msgf("will create nginx-apex since apexContentExists was %v", apexContentExists)
-	}
-
-	if strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider)) == CIVO_GITHUB {
-		err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/clusters/%s", gitopsRepoDir, clusterName), opt)
-	} else {
-		err = cp.Copy(clusterContent, fmt.Sprintf("%s/registry/%s", gitopsRepoDir, clusterName), opt)
-	}
-	if err != nil {
-		log.Info().Msgf("Error populating cluster content with %s. error: %s", clusterContent, err.Error())
-		return err
-	}
-	os.RemoveAll(fmt.Sprintf("%s/cluster-types", gitopsRepoDir))
-	os.RemoveAll(fmt.Sprintf("%s/services", gitopsRepoDir))
 
 	return nil
 }
@@ -594,356 +200,129 @@ func AdjustMetaphorRepo(
 	destinationMetaphorRepoURL string,
 	gitopsRepoDir string,
 	gitProvider string,
+	cloudProvider string,
 	k1Dir string,
 ) error {
-	//* create ~/.k1/metaphor
-	metaphorDir := fmt.Sprintf("%s/metaphor", k1Dir)
-	os.Mkdir(metaphorDir, 0700)
+	// * create ~/.k1/metaphor
+	metaphorDir := filepath.Join(k1Dir, "metaphor")
+	if err := os.Mkdir(metaphorDir, 0o700); err != nil {
+		log.Error().Msgf("Error creating metaphor directory at %s. error: %s", metaphorDir, err.Error())
+		return fmt.Errorf("error creating metaphor directory at %s: %w", metaphorDir, err)
+	}
 
-	//* git init
+	// * git init
 	metaphorRepo, err := git.PlainInit(metaphorDir, false)
 	if err != nil {
-		return err
+		log.Error().Msgf("Error initializing git repository at %s. error: %s", metaphorDir, err.Error())
+		return fmt.Errorf("error initializing git repository at %s: %w", metaphorDir, err)
 	}
 
-	//* copy options
-	opt := cp.Options{
-		Skip: func(src string) (bool, error) {
-			if strings.HasSuffix(src, ".git") {
-				return true, nil
-			} else if strings.Index(src, "/.terraform") > 0 {
-				return true, nil
+	switch fmt.Sprintf("%s-%s", cloudProvider, gitProvider) {
+	case AkamaiGitHub,
+		AwsGitHub,
+		AwsGitLab,
+		CivoGitHub,
+		CivoGitLab:
+
+		// * metaphor app source
+		metaphorContent := filepath.Join(gitopsRepoDir, "metaphor")
+		if err := copyContents(metaphorContent, metaphorDir, false); err != nil {
+			return err
+		}
+
+		// Remove metaphor content from gitops repository directory
+		if err := os.RemoveAll(metaphorContent); err != nil {
+			log.Error().Msgf("Error removing %q from filesystem: %s", metaphorContent, err.Error())
+			return fmt.Errorf("error removing %q from filesystem: %w", metaphorContent, err)
+		}
+	default:
+		// * remove .argo and .github folders
+		var (
+			dotArgoFolder   = filepath.Join(metaphorDir, ".argo")
+			dotGitHubFolder = filepath.Join(metaphorDir, ".github")
+		)
+
+		if err := os.RemoveAll(dotArgoFolder); err != nil {
+			log.Error().Msgf("Error removing %q from filesystem: %s", dotArgoFolder, err.Error())
+			return fmt.Errorf("error removing %q from filesystem: %w", dotArgoFolder, err)
+		}
+
+		if err := os.RemoveAll(dotGitHubFolder); err != nil {
+			log.Error().Msgf("Error removing %q from filesystem: %s", dotGitHubFolder, err.Error())
+			return fmt.Errorf("error removing %q from filesystem: %w", dotGitHubFolder, err)
+		}
+
+		// * copy ci content
+		if gitProvider == "github" || gitProvider == "gitlab" {
+			var src, dest string
+
+			if gitProvider == "github" {
+				src = filepath.Join(k1Dir, "gitops", "ci", ".github")
+				dest = filepath.Join(metaphorDir, ".github")
+			} else {
+				src = filepath.Join(k1Dir, "gitops", "ci", ".gitlab-ci.yml")
+				dest = filepath.Join(metaphorDir, ".gitlab-ci.yml")
 			}
-			// Add more stuff to be ignored here
-			return false, nil
-		},
-	}
 
-	AKAMAI_GITHUB := "akamai-github"
+			if err := copyContents(src, dest, true); err != nil {
+				return fmt.Errorf("error copying CI content: %w", err)
+			}
+		}
 
-	if strings.ToLower(fmt.Sprintf("akamai-%s", gitProvider)) != AKAMAI_GITHUB {
-		os.RemoveAll(metaphorDir + "/.argo")
-		os.RemoveAll(metaphorDir + "/.github")
-	}
+		// * metaphor app source
+		metaphorLocation := filepath.Join(gitopsRepoDir, "metaphor")
+		if err := copyContents(metaphorLocation, metaphorDir, false); err != nil {
+			return fmt.Errorf("error copying metaphor app source: %w", err)
+		}
 
-	//todo implement repo, err :- createMetaphor() which returns the metaphor repoository object, removes content from
-	// gitops and then allows gitops to commit during its sequence of ops
-	if strings.ToLower(fmt.Sprintf("akamai-%s", gitProvider)) == AKAMAI_GITHUB {
-		//* metaphor app source
-		metaphorContent := fmt.Sprintf("%s/metaphor", gitopsRepoDir)
-		err = cp.Copy(metaphorContent, metaphorDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating metaphor content with %s. error: %s", metaphorContent, err.Error())
-			return err
+		// * copy $HOME/.k1/gitops/ci/.argo/* $HOME/.k1/metaphor/.argo
+		argoWorkflowsSource := filepath.Join(k1Dir, "gitops", "ci", ".argo")
+		argoWorkflowsDest := filepath.Join(metaphorDir, ".argo")
+		if err := copyContents(argoWorkflowsSource, argoWorkflowsDest, true); err != nil {
+			return fmt.Errorf("error copying argo workflows content: %w", err)
+		}
+
+		// * copy $HOME/.k1/gitops/metaphor/Dockerfile $HOME/.k1/metaphor/build/Dockerfile
+		dockerfileSource := filepath.Join(metaphorDir, "Dockerfile")
+		dockerfileDest := filepath.Join(metaphorDir, "build", "Dockerfile")
+		if err := copyContents(dockerfileSource, dockerfileDest, true); err != nil {
+			return fmt.Errorf("error copying metaphor Dockerfile content: %w", err)
 		}
 
 		// Remove metaphor content from gitops repository directory
-		os.RemoveAll(fmt.Sprintf("%s/metaphor", gitopsRepoDir))
-
-		err = gitClient.Commit(metaphorRepo, "init commit pre ref change")
-		if err != nil {
-			return err
-		}
-
-		metaphorRepo, err = gitClient.SetRefToMainBranch(metaphorRepo)
-		if err != nil {
-			return err
-		}
-
-		// remove old git ref
-		err = metaphorRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
-		if err != nil {
-			return fmt.Errorf("error removing previous git ref: %s", err)
-		}
-
-		// create remote
-		_, err = metaphorRepo.CreateRemote(&config.RemoteConfig{
-			Name: "origin",
-			URLs: []string{destinationMetaphorRepoURL},
-		})
-		if err != nil {
-			return fmt.Errorf("error creating remote for metaphor repository: %s", err)
-		}
-
-		return nil
-
-	}
-
-	AWS_GITHUB := "aws-github"
-
-	if strings.ToLower(fmt.Sprintf("aws-%s", gitProvider)) != AWS_GITHUB {
-		os.RemoveAll(metaphorDir + "/.argo")
-		os.RemoveAll(metaphorDir + "/.github")
-	}
-
-	// todo implement repo, err :- createMetaphor() which returns the metaphor repoository object, removes content from
-	// gitops and then allows gitops to commit during its sequence of ops
-	if strings.ToLower(fmt.Sprintf("aws-%s", gitProvider)) == AWS_GITHUB {
-		//* metaphor app source
-		metaphorContent := fmt.Sprintf("%s/metaphor", gitopsRepoDir)
-		err = cp.Copy(metaphorContent, metaphorDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating metaphor content with %s. error: %s", metaphorContent, err.Error())
-			return err
-		}
-
-		// Remove metaphor content from gitops repository directory
-		os.RemoveAll(fmt.Sprintf("%s/metaphor", gitopsRepoDir))
-
-		err = gitClient.Commit(metaphorRepo, "init commit pre ref change")
-		if err != nil {
-			return err
-		}
-
-		metaphorRepo, err = gitClient.SetRefToMainBranch(metaphorRepo)
-		if err != nil {
-			return err
-		}
-
-		// remove old git ref
-		err = metaphorRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
-		if err != nil {
-			return fmt.Errorf("error removing previous git ref: %s", err)
-		}
-
-		// create remote
-		_, err = metaphorRepo.CreateRemote(&config.RemoteConfig{
-			Name: "origin",
-			URLs: []string{destinationMetaphorRepoURL},
-		})
-		if err != nil {
-			return fmt.Errorf("error creating remote for metaphor repository: %s", err)
-		}
-
-		return nil
-
-	}
-
-	AWS_GITLAB := "aws-gitlab"
-
-	if strings.ToLower(fmt.Sprintf("aws-%s", gitProvider)) != AWS_GITLAB {
-		os.RemoveAll(metaphorDir + "/.argo")
-		os.RemoveAll(metaphorDir + "/.github")
-	}
-
-	// todo implement repo, err :- createMetaphor() which returns the metaphor repoository object, removes content from
-	// gitops and then allows gitops to commit during its sequence of ops
-	if strings.ToLower(fmt.Sprintf("aws-%s", gitProvider)) == AWS_GITLAB {
-		//* metaphor app source
-		metaphorContent := fmt.Sprintf("%s/metaphor", gitopsRepoDir)
-		err = cp.Copy(metaphorContent, metaphorDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating metaphor content with %s. error: %s", metaphorContent, err.Error())
-			return err
-		}
-
-		// Remove metaphor content from gitops repository directory
-		os.RemoveAll(fmt.Sprintf("%s/metaphor", gitopsRepoDir))
-
-		err = gitClient.Commit(metaphorRepo, "init commit pre ref change")
-		if err != nil {
-			return err
-		}
-
-		metaphorRepo, err = gitClient.SetRefToMainBranch(metaphorRepo)
-		if err != nil {
-			return err
-		}
-
-		// remove old git ref
-		err = metaphorRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
-		if err != nil {
-			return fmt.Errorf("error removing previous git ref: %s", err)
-		}
-
-		// create remote
-		_, err = metaphorRepo.CreateRemote(&config.RemoteConfig{
-			Name: "origin",
-			URLs: []string{destinationMetaphorRepoURL},
-		})
-		if err != nil {
-			return fmt.Errorf("error creating remote for metaphor repository: %s", err)
-		}
-
-		return nil
-
-	}
-
-	CIVO_GITHUB := "civo-github"
-
-	if strings.ToLower(fmt.Sprintf("civo-%s", gitProvider)) != CIVO_GITHUB {
-		os.RemoveAll(metaphorDir + "/.argo")
-		os.RemoveAll(metaphorDir + "/.github")
-	}
-
-	// todo implement repo, err :- createMetaphor() which returns the metaphor repoository object, removes content from
-	// gitops and then allows gitops to commit during its sequence of ops
-	if strings.ToLower(fmt.Sprintf("civo-%s", gitProvider)) == CIVO_GITHUB {
-		//* metaphor app source
-		metaphorContent := fmt.Sprintf("%s/metaphor", gitopsRepoDir)
-		err = cp.Copy(metaphorContent, metaphorDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating metaphor content with %s. error: %s", metaphorContent, err.Error())
-			return err
-		}
-
-		// Remove metaphor content from gitops repository directory
-		os.RemoveAll(fmt.Sprintf("%s/metaphor", gitopsRepoDir))
-
-		err = gitClient.Commit(metaphorRepo, "init commit pre ref change")
-		if err != nil {
-			return err
-		}
-
-		metaphorRepo, err = gitClient.SetRefToMainBranch(metaphorRepo)
-		if err != nil {
-			return err
-		}
-
-		// remove old git ref
-		err = metaphorRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
-		if err != nil {
-			return fmt.Errorf("error removing previous git ref: %s", err)
-		}
-
-		// create remote
-		_, err = metaphorRepo.CreateRemote(&config.RemoteConfig{
-			Name: "origin",
-			URLs: []string{destinationMetaphorRepoURL},
-		})
-		if err != nil {
-			return fmt.Errorf("error creating remote for metaphor repository: %s", err)
-		}
-
-		return nil
-
-	}
-
-	CIVO_GITLAB := "civo-gitlab"
-
-	if strings.ToLower(fmt.Sprintf("civo-%s", gitProvider)) != CIVO_GITLAB {
-		os.RemoveAll(metaphorDir + "/.argo")
-		os.RemoveAll(metaphorDir + "/.github")
-	}
-
-	// todo implement repo, err :- createMetaphor() which returns the metaphor repoository object, removes content from
-	// gitops and then allows gitops to commit during its sequence of ops
-	if strings.ToLower(fmt.Sprintf("civo-%s", gitProvider)) == CIVO_GITLAB {
-		//* metaphor app source
-		metaphorContent := fmt.Sprintf("%s/metaphor", gitopsRepoDir)
-		err = cp.Copy(metaphorContent, metaphorDir, opt)
-		if err != nil {
-			log.Info().Msgf("Error populating metaphor content with %s. error: %s", metaphorContent, err.Error())
-			return err
-		}
-
-		// Remove metaphor content from gitops repository directory
-		os.RemoveAll(fmt.Sprintf("%s/metaphor", gitopsRepoDir))
-
-		err = gitClient.Commit(metaphorRepo, "init commit pre ref change")
-		if err != nil {
-			return err
-		}
-
-		metaphorRepo, err = gitClient.SetRefToMainBranch(metaphorRepo)
-		if err != nil {
-			return err
-		}
-
-		// remove old git ref
-		err = metaphorRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
-		if err != nil {
-			return fmt.Errorf("error removing previous git ref: %s", err)
-		}
-
-		// create remote
-		_, err = metaphorRepo.CreateRemote(&config.RemoteConfig{
-			Name: "origin",
-			URLs: []string{destinationMetaphorRepoURL},
-		})
-		if err != nil {
-			return fmt.Errorf("error creating remote for metaphor repository: %s", err)
-		}
-
-		return nil
-
-	}
-
-	//* copy ci content
-	switch gitProvider {
-	case "github":
-		//* copy $HOME/.k1/gitops/ci/.github/* $HOME/.k1/metaphor/.github
-		githubActionsFolderContent := fmt.Sprintf("%s/gitops/ci/.github", k1Dir)
-		log.Info().Msgf("copying github content: %s", githubActionsFolderContent)
-		err := cp.Copy(githubActionsFolderContent, fmt.Sprintf("%s/.github", metaphorDir), opt)
-		if err != nil {
-			log.Info().Msgf("error populating metaphor repository with %s: %s", githubActionsFolderContent, err)
-			return err
-		}
-	case "gitlab":
-		//* copy $HOME/.k1/gitops/ci/.gitlab-ci.yml/* $HOME/.k1/metaphor/.github
-		gitlabCIContent := fmt.Sprintf("%s/gitops/ci/.gitlab-ci.yml", k1Dir)
-		log.Info().Msgf("copying gitlab content: %s", gitlabCIContent)
-		err := cp.Copy(gitlabCIContent, fmt.Sprintf("%s/.gitlab-ci.yml", metaphorDir), opt)
-		if err != nil {
-			log.Info().Msgf("error populating metaphor repository with %s: %s", gitlabCIContent, err)
-			return err
+		if err := os.RemoveAll(metaphorLocation); err != nil {
+			log.Error().Msgf("Error removing %q from filesystem: %s", metaphorLocation, err.Error())
+			return fmt.Errorf("error removing %q from filesystem: %w", metaphorLocation, err)
 		}
 	}
 
-	//* metaphor app source
-	metaphorContent := fmt.Sprintf("%s/metaphor", gitopsRepoDir)
-	err = cp.Copy(metaphorContent, metaphorDir, opt)
-	if err != nil {
-		log.Info().Msgf("Error populating metaphor content with %s. error: %s", metaphorContent, err.Error())
-		return err
-	}
-
-	//* copy $HOME/.k1/gitops/ci/.argo/* $HOME/.k1/metaphor/.argo
-	argoWorkflowsFolderContent := fmt.Sprintf("%s/gitops/ci/.argo", k1Dir)
-	log.Info().Msgf("copying argo workflows content: %s", argoWorkflowsFolderContent)
-	err = cp.Copy(argoWorkflowsFolderContent, fmt.Sprintf("%s/.argo", metaphorDir), opt)
-	if err != nil {
-		log.Info().Msgf("error populating metaphor repository with %s: %s", argoWorkflowsFolderContent, err)
-		return err
-	}
-
-	//* copy $HOME/.k1/gitops/metaphor/Dockerfile $HOME/.k1/metaphor/build/Dockerfile
-	dockerfileContent := fmt.Sprintf("%s/Dockerfile", metaphorDir)
-	os.Mkdir(metaphorDir+"/build", 0700)
-	log.Info().Msgf("copying dockerfile content: %s", argoWorkflowsFolderContent)
-	err = cp.Copy(dockerfileContent, fmt.Sprintf("%s/build/Dockerfile", metaphorDir), opt)
-	if err != nil {
-		log.Info().Msgf("error populating metaphor repository with %s: %s", argoWorkflowsFolderContent, err)
-		return err
-	}
-
-	// Remove metaphor content from gitops repository directory
-	os.RemoveAll(fmt.Sprintf("%s/metaphor", gitopsRepoDir))
-
-	err = gitClient.Commit(metaphorRepo, "init commit pre ref change")
-	if err != nil {
-		return err
+	if err := gitClient.Commit(metaphorRepo, "init commit pre ref change"); err != nil {
+		log.Error().Msgf("Error committing initial metaphor content: %s", err.Error())
+		return fmt.Errorf("error committing initial metaphor content: %w", err)
 	}
 
 	metaphorRepo, err = gitClient.SetRefToMainBranch(metaphorRepo)
 	if err != nil {
-		return err
+		log.Error().Msgf("Error setting ref to main branch: %s", err.Error())
+		return fmt.Errorf("error setting ref to main branch: %w", err)
 	}
 
 	// remove old git ref
 	err = metaphorRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
 	if err != nil {
-		return fmt.Errorf("error removing previous git ref: %s", err)
+		log.Error().Msgf("Error removing previous git ref: %s", err.Error())
+		return fmt.Errorf("error removing previous git ref: %w", err)
 	}
 
 	// create remote
-	_, err = metaphorRepo.CreateRemote(&config.RemoteConfig{
+	opts := &config.RemoteConfig{
 		Name: "origin",
 		URLs: []string{destinationMetaphorRepoURL},
-	})
-	if err != nil {
-		return fmt.Errorf("error creating remote for metaphor repository: %s", err)
+	}
+
+	if _, err = metaphorRepo.CreateRemote(opts); err != nil {
+		log.Error().Msgf("Error creating remote for metaphor repository: %s", err.Error())
+		return fmt.Errorf("error creating remote for metaphor repository: %w", err)
 	}
 
 	return nil
@@ -968,71 +347,78 @@ func PrepareGitRepositories(
 	gitProtocol string,
 	useCloudflareOriginIssuer bool,
 ) error {
-	//* clone the gitops-template repo
+	// * clone the gitops-template repo
 	gitopsRepo, err := gitClient.CloneRefSetMain(gitopsTemplateBranch, gitopsDir, gitopsTemplateURL)
 	if err != nil {
-		log.Panic().Msgf("error opening repo at: %s, err: %v", gitopsDir, err)
+		log.Error().Msgf("error opening repo at: %s, err: %s", gitopsDir, err.Error())
+		return fmt.Errorf("error opening repo at: %s, err: %w", gitopsDir, err)
 	}
+
 	log.Info().Msg("gitops repository clone complete")
 
 	// ADJUST CONTENT
-	//* adjust the content for the gitops repo
-	err = AdjustGitopsRepo(cloudProvider, clusterName, clusterType, gitopsDir, gitProvider, k1Dir, apexContentExists, useCloudflareOriginIssuer)
+	// * adjust the content for the gitops repo
+	err = AdjustGitopsRepo(cloudProvider, clusterName, clusterType, gitopsDir, gitProvider, apexContentExists, useCloudflareOriginIssuer)
 	if err != nil {
-		log.Info().Msgf("err: %v", err)
-		return err
+		log.Error().Msgf("unable to prepare repository: %s", err.Error())
+		return fmt.Errorf("unable to prepare repository: %w", err)
 	}
 
 	// DETOKENIZE
-	//* detokenize the gitops repo
-	DetokenizeGitGitops(gitopsDir, gitopsTokens, gitProtocol, useCloudflareOriginIssuer)
-	if err != nil {
-		return err
+	// * detokenize the gitops repo
+	if err := DetokenizeGitGitops(gitopsDir, gitopsTokens, gitProtocol, useCloudflareOriginIssuer); err != nil {
+		log.Error().Msgf("unable to detokenize gitops repository: %s", err.Error())
+		return fmt.Errorf("unable to detokenize gitops repository: %w", err)
 	}
 
 	// ADJUST CONTENT
-	//* adjust the content for the metaphor repo
-	err = AdjustMetaphorRepo(destinationMetaphorRepoURL, gitopsDir, gitProvider, k1Dir)
-	if err != nil {
-		return err
+	// * adjust the content for the metaphor repo
+	if err := AdjustMetaphorRepo(destinationMetaphorRepoURL, gitopsDir, gitProvider, cloudProvider, k1Dir); err != nil {
+		log.Error().Msgf("unable to prepare metaphor repository: %s", err.Error())
+		return fmt.Errorf("unable to prepare metaphor repository: %w", err)
 	}
 
 	// DETOKENIZE
-	//* detokenize the metaphor repo
-	DetokenizeGitMetaphor(metaphorDir, metaphorTokens)
-	if err != nil {
-		return err
+	// * detokenize the metaphor repo
+	if err := DetokenizeGitMetaphor(metaphorDir, metaphorTokens); err != nil {
+		log.Error().Msgf("unable to detokenize metaphor repository: %s", err.Error())
+		return fmt.Errorf("unable to detokenize metaphor repository: %w", err)
 	}
 
 	// COMMIT
-	//* commit initial gitops-template content
+	// * commit initial gitops-template content
 	err = gitClient.Commit(gitopsRepo, "committing initial detokenized gitops-template repo content")
 	if err != nil {
-		return err
+		log.Error().Msgf("unable to commit initial gitops-template content: %s", err.Error())
+		return fmt.Errorf("unable to commit initial gitops-template content: %w", err)
 	}
 
-	//* commit initial metaphor content
+	// * commit initial metaphor content
 	metaphorRepo, err := git.PlainOpen(metaphorDir)
 	if err != nil {
-		return fmt.Errorf("error opening metaphor git repository: %s", err)
+		log.Error().Msgf("error opening metaphor git repository: %s", err.Error())
+		return fmt.Errorf("error opening metaphor git repository: %w", err)
 	}
 
 	err = gitClient.Commit(metaphorRepo, "committing initial detokenized metaphor repo content")
 	if err != nil {
-		return err
+		log.Error().Msgf("unable to commit initial metaphor content: %s", err.Error())
+		return fmt.Errorf("unable to commit initial metaphor content: %w", err)
 	}
 
 	// ADD REMOTE(S)
-	//* add new remote for gitops repo
+	// * add new remote for gitops repo
 	err = gitClient.AddRemote(destinationGitopsRepoURL, gitProvider, gitopsRepo)
 	if err != nil {
-		return err
+		log.Error().Msgf("unable to add remote for gitops repo: %s", err.Error())
+		return fmt.Errorf("unable to add remote for gitops repo: %w", err)
 	}
 
-	//* add new remote for metaphor repo
+	// * add new remote for metaphor repo
 	err = gitClient.AddRemote(destinationMetaphorRepoURL, gitProvider, metaphorRepo)
 	if err != nil {
-		return err
+		log.Error().Msgf("unable to add remote for metaphor repo: %s", err.Error())
+		return fmt.Errorf("unable to add remote for metaphor repo: %w", err)
 	}
 
 	return nil

@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 )
 
-func (conf *AWSConfiguration) GetECRAuthToken() (string, error) {
+func (conf *Configuration) GetECRAuthToken() (string, error) {
 	fmt.Println("getting ecr auth token")
 	ecrClient := ecr.NewFromConfig(conf.Config)
 

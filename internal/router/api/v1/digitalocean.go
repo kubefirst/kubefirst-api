@@ -33,7 +33,7 @@ func PostValidateDigitalOceanDomain(c *gin.Context) {
 		return
 	}
 
-	digitaloceanConf := digitalocean.DigitaloceanConfiguration{
+	digitaloceanConf := digitalocean.Configuration{
 		Client:  digitalocean.NewDigitalocean(request.Token),
 		Context: context.Background(),
 	}

@@ -62,7 +62,6 @@ func ExecShellReturnStringsV2(command string, args ...string) (string, error) {
 //   - On-the-fly logging of result
 //   - Map of Vars loaded
 func ExecShellWithVars(osvars map[string]string, command string, args ...string) error {
-
 	log.Debug().Msgf("Debug: Running %s", command)
 	for k, v := range osvars {
 		os.Setenv(k, v)
@@ -97,7 +96,7 @@ func ExecShellWithVars(osvars map[string]string, command string, args ...string)
 		doneOut <- true
 	}()
 	go func() {
-		// STD Err should not be supressed, as it prevents to troubleshoot issues in case something fails.
+		// STD Err should not be suppressed, as it prevents to troubleshoot issues in case something fails.
 		// On linux StdErr > StdOut by design in terms of priority.
 		for msg := range stdErr {
 			log.Warn().Msgf("ERR: %s", msg)
@@ -109,14 +108,14 @@ func ExecShellWithVars(osvars map[string]string, command string, args ...string)
 	if err != nil {
 		log.Error().Err(err).Msgf("command %q failed", command)
 		return err
-	} else {
-		close(stdOut)
-		close(stdErr)
 	}
+
+	close(stdOut)
+	close(stdErr)
+
 	<-doneOut
 	<-doneErr
 	return nil
-
 }
 
 // Not meant to be exported, for internal use only.

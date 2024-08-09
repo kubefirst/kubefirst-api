@@ -66,8 +66,8 @@ func TestEnv(t *testing.T) {
 		t.Errorf("expected CloudProvider to be 'cloud_provider', but got '%s'", env.CloudProvider)
 	}
 
-	if env.ClusterId != "cluster_id" {
-		t.Errorf("expected ClusterId to be 'cluster_id', but got '%s'", env.ClusterId)
+	if env.ClusterID != "cluster_id" {
+		t.Errorf("expected ClusterId to be 'cluster_id', but got '%s'", env.ClusterID)
 	}
 
 	if env.ClusterType != "cluster_type" {
@@ -110,7 +110,7 @@ func TestEnv(t *testing.T) {
 		t.Errorf("expected InCluster to be false, but got %v", env.InCluster)
 	}
 
-	if env.EnterpriseApiUrl != "enterprise_api_url" {
-		t.Errorf("expected EnterpriseApiUrl to be 'enterprise_api_url', but got '%s'", env.EnterpriseApiUrl)
+	if env.EnterpriseAPIURL != "enterprise_api_url" {
+		t.Errorf("expected EnterpriseApiUrl to be 'enterprise_api_url', but got '%s'", env.EnterpriseAPIURL)
 	}
 }

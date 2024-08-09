@@ -4,7 +4,7 @@ Copyright (C) 2021-2023, Kubefirst
 This program is licensed under MIT.
 See the LICENSE file for more details.
 */
-package progressPrinter
+package progressPrinter //nolint:revive // allowing during code reorg
 
 import (
 	"flag"
@@ -30,8 +30,10 @@ type progressPrinter struct {
 	pw       progress.Writer
 }
 
-var instance *progressPrinter
-var once sync.Once
+var (
+	instance *progressPrinter
+	once     sync.Once
+)
 
 // GetInstance  Function used to initialize the component once in the execution.
 // Usually called from the `cmd`  `init` func or as early as possible on the execution.
@@ -41,13 +43,14 @@ var once sync.Once
 //			progressPrinter.GetInstance()
 //			progressPrinter.SetupProgress(5) // Number of bars for the entire run.
 //	}
+//
+//nolint:revive // allowing during code reorg
 func GetInstance() *progressPrinter {
 	once.Do(func() {
 		instance = &progressPrinter{}
 		instance.Trackers = make(map[string]*ActionTracker)
 		// instantiate a Progress Writer and set up the options
 		instance.pw = progress.NewWriter()
-
 	})
 	return instance
 }
@@ -111,13 +114,13 @@ func LogMessage(message string) {
 	instance.pw.Log(message)
 }
 
-// AddTracker Add Tracker (prefered way)
+// AddTracker Add Tracker (preferred way)
 // Return a string for the key to be used on future uses
 // Sample of usage:
 //
 //	progressPrinter.AddTracker("step-base", "Apply Base ", 3)
 //
-// no need to instanciate, it is a singleton, only one instance already started before use.
+// no need to instantiate, it is a singleton, only one instance already started before use.
 func AddTracker(key string, title string, total int64) string {
 	instance.Trackers[key] = &ActionTracker{Tracker: CreateTracker(title, total)}
 	return key
@@ -129,10 +132,10 @@ func TotalOfTrackers() int {
 }
 
 // IncrementTracker Increments a tracker based on the provided key
-// if key is unkown it will error out.
+// if key is unknown it will error out.
 // Sample of usage:
 //
 //	progressPrinter.IncrementTracker("step-base", 1)
-func IncrementTracker(key string, value int64) {
+func IncrementTracker(key string) {
 	instance.Trackers[key].Tracker.Increment(int64(1))
 }

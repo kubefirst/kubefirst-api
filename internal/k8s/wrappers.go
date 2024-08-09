@@ -81,5 +81,4 @@ func OpenPortForwardPodWrapper(
 	}
 
 	log.Info().Msgf("pod %q at namespace %q has port-forward accepting local connections at port %d\n", podName, namespace, podLocalPort)
-
 }

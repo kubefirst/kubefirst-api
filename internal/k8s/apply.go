@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -29,38 +30,37 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
-var decUnstructured = yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-
 // ApplyObjects parses a structured Kubernetes-compatible yaml file and applies
 // its objects to a target Kubernetes cluster
-func (kcl KubernetesClient) ApplyObjects(namespace string, yamlData [][]byte) error {
+func (kcl KubernetesClient) ApplyObjects(yamlData [][]byte) error {
 	log.Info().Msgf("applying objects against kubernetes cluster")
 
+	// RESTMapper to find GVR
+	dc, err := discovery.NewDiscoveryClientForConfig(kcl.RestConfig)
+	if err != nil {
+		return fmt.Errorf("error creating discovery client: %w", err)
+	}
+	// Dynamic client
+	dyn, err := dynamic.NewForConfig(kcl.RestConfig)
+	if err != nil {
+		return fmt.Errorf("error creating dynamic client: %w", err)
+	}
+
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(dc))
+	decUnstructured := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+
 	for _, resource := range yamlData {
-		// RESTMapper to find GVR
-		dc, err := discovery.NewDiscoveryClientForConfig(kcl.RestConfig)
-		if err != nil {
-			return err
-		}
-		mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(dc))
-
-		// Dynamic client
-		dyn, err := dynamic.NewForConfig(kcl.RestConfig)
-		if err != nil {
-			return err
-		}
-
 		// Decode YAML manifest into unstructured.Unstructured
 		obj := &unstructured.Unstructured{}
 		_, gvk, err := decUnstructured.Decode(resource, nil, obj)
 		if err != nil {
-			return err
+			return fmt.Errorf("error decoding data into unstructured object: %w", err)
 		}
 
 		// Find GVR
 		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
-			return err
+			return fmt.Errorf("error finding GVR for %q: %w", gvk.Kind, err)
 		}
 
 		// REST interface for the GVR
@@ -76,7 +76,7 @@ func (kcl KubernetesClient) ApplyObjects(namespace string, yamlData [][]byte) er
 		// Marshal object into JSON
 		data, err := json.Marshal(obj)
 		if err != nil {
-			return err
+			return fmt.Errorf("error marshalling object %q into JSON: %w", obj.GetName(), err)
 		}
 
 		// Create or Update the object with server-side apply
@@ -87,8 +87,9 @@ func (kcl KubernetesClient) ApplyObjects(namespace string, yamlData [][]byte) er
 			FieldManager: "kubefirst",
 		})
 		if err != nil {
-			return fmt.Errorf("error applying %s %s: %s", gvk.Kind, obj.GetName(), err)
+			return fmt.Errorf("error applying %s/%s: %w", gvk.Kind, obj.GetName(), err)
 		}
+
 		log.Info().Msgf("applied %s %s", gvk.Kind, obj.GetName())
 	}
 
@@ -108,9 +109,8 @@ func (kcl KubernetesClient) KustomizeBuild(kustomizationDirectory string) (*byte
 	buffer := new(bytes.Buffer)
 	cmd := kbuild.NewCmdBuild(fSys, kbuild.MakeHelp("kubefirst", "internal kustomize build"), buffer)
 
-	err := cmd.RunE(cmd, []string{kustomizationDirectory})
-	if err != nil {
-		return &bytes.Buffer{}, err
+	if err := cmd.RunE(cmd, []string{kustomizationDirectory}); err != nil {
+		return nil, fmt.Errorf("error running kustomize build: %w", err)
 	}
 
 	return buffer, nil
@@ -134,16 +134,19 @@ func (kcl KubernetesClient) SplitYAMLFile(yamlData *bytes.Buffer) ([][]byte, err
 	for {
 		var value interface{}
 		err := dec.Decode(&value)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
+
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error decoding yaml: %w", err)
 		}
+
 		valueBytes, err := goyaml.Marshal(value)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error marshalling yaml: %w", err)
 		}
+
 		res = append(res, valueBytes)
 	}
 

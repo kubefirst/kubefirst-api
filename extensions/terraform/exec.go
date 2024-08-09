@@ -7,7 +7,8 @@ See the LICENSE file for more details.
 package terraform
 
 import (
-	"bufio"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -15,77 +16,42 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+type outputLogger struct {
+	prefix  string
+	isError bool
+}
+
+func (l outputLogger) Write(p []byte) (n int, err error) {
+	if l.isError {
+		log.Error().Msgf("%s %s", l.prefix, string(p))
+	} else {
+		log.Info().Msgf("%s %s", l.prefix, string(p))
+	}
+	return len(p), nil
+}
+
 // ExecShellWithVars Exec shell actions supporting:
 //   - On-the-fly logging of result
 //   - Map of Vars loaded
 func ExecShellWithVars(osvars map[string]string, command string, args ...string) error {
+	allvars := os.Environ()
 	for k, v := range osvars {
-		os.Setenv(k, v)
-		suppressedValue := strings.Repeat("*", len(v))
-		log.Printf(" export %s = %s", k, suppressedValue)
+		allvars = append(allvars, k+"="+v)
+		log.Info().Msgf("adding %s=%q to environment", k, strings.Repeat("*", len(v)))
 	}
+
 	cmd := exec.Command(command, args...)
-	cmdReaderOut, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Printf("failed creating out pipe for: %v", command)
-		return err
-	}
-	cmdReaderErr, err := cmd.StderrPipe()
-	if err != nil {
-		log.Printf("failed creating out pipe for: %v", command)
-		return err
-	}
+	cmd.Stdout = &outputLogger{prefix: command, isError: false}
+	cmd.Stderr = &outputLogger{prefix: command, isError: true}
+	cmd.Env = allvars
 
-	scannerOut := bufio.NewScanner(cmdReaderOut)
-	stdOut := make(chan string)
-	go reader(scannerOut, stdOut)
-	doneOut := make(chan bool)
-
-	scannerErr := bufio.NewScanner(cmdReaderErr)
-	stdErr := make(chan string)
-	go reader(scannerErr, stdErr)
-	doneErr := make(chan bool)
-	go func() {
-		for msg := range stdOut {
-			log.Printf("OUT: %s", msg)
+	if err := cmd.Run(); err != nil {
+		if exitError := new(exec.ExitError); errors.As(err, &exitError) {
+			return fmt.Errorf("command %s failed with exit code %d", command, exitError.ExitCode())
 		}
-		doneOut <- true
-	}()
-	go func() {
-		// STD Err should not be supressed, as it prevents to troubleshoot issues in case something fails.
-		// On linux StdErr > StdOut by design in terms of priority.
-		for msg := range stdErr {
-			log.Printf("ERR: %s", msg)
-		}
-		doneErr <- true
-	}()
 
-	err = cmd.Run()
-	if err != nil {
-		log.Printf("command %q failed", command)
-		close(stdOut)
-		close(stdErr)
-		<-doneOut
-		<-doneErr
-		return err
-	} else {
-		close(stdOut)
-		close(stdErr)
+		return fmt.Errorf("command %s failed: %w", command, err)
 	}
-	<-doneOut
-	<-doneErr
+
 	return nil
-
-}
-
-// Not meant to be exported, for internal use only.
-func reader(scanner *bufio.Scanner, out chan string) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Error processing logs from command. Error: %s", r)
-		}
-	}()
-	for scanner.Scan() {
-		out <- scanner.Text()
-	}
 }

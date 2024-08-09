@@ -17,7 +17,7 @@ type Response struct {
 // CertificateQueryResult details each object in the returned response's
 // results field
 type CertificateQueryResult struct {
-	Id  int    `json:"crtsh_id"`
+	ID  int    `json:"crtsh_id"`
 	Der string `json:"der"`
 }
 

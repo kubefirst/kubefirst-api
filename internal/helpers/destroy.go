@@ -7,6 +7,7 @@ See the LICENSE file for more details.
 package helpers
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -21,6 +22,7 @@ func EvalDestroy(expectedCloudProvider string, expectedGitProvider string) (bool
 	setupComplete := viper.GetBool("kubefirst.setup-complete")
 
 	if !setupComplete {
+		//nolint:revive,stylecheck // this error is printed to the user
 		return false, fmt.Errorf(
 			"there are no active kubefirst platforms to destroy.\n\tTo get started, run: kubefirst %s create -h\n",
 			expectedCloudProvider,
@@ -28,7 +30,7 @@ func EvalDestroy(expectedCloudProvider string, expectedGitProvider string) (bool
 	}
 
 	if cloudProvider == "" || gitProvider == "" {
-		return false, fmt.Errorf("could not parse cloud and git provider information from config")
+		return false, errors.New("could not parse cloud and git provider information from config")
 	}
 	log.Info().Msgf("Verified %s platform using %s - continuing with destroy...", expectedCloudProvider, expectedGitProvider)
 

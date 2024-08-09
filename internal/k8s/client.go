@@ -20,8 +20,6 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-var fs afero.Fs = afero.NewOsFs()
-
 type KubernetesClient struct {
 	Clientset      *kubernetes.Clientset
 	RestConfig     *rest.Config
@@ -54,6 +52,7 @@ func CreateKubeConfig(inCluster bool, kubeConfigPath string) *KubernetesClient {
 
 	// Set path to kubeconfig
 	kubeconfig := returnKubeConfigPath(kubeConfigPath)
+	fs := afero.NewOsFs()
 
 	// Check to make sure kubeconfig actually exists
 	// If it doesn't, go fetch it

@@ -17,17 +17,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ImportClusterIfEmpty(silent bool) (pkgtypes.Cluster, error) {
+func ImportClusterIfEmpty() (pkgtypes.Cluster, error) {
 	// find the secret in mgmt cluster's kubefirst namespace and read import payload and clustername
 	cluster := pkgtypes.Cluster{}
 	env, _ := env.GetEnv(constants.SilenceGetEnv)
 
-	var isClusterZero bool = true
-	if env.IsClusterZero == "false" {
-		isClusterZero = false
-	}
-
-	if isClusterZero {
+	if env.IsClusterZero == "true" {
 		log.Info().Msg("IS_CLUSTER_ZERO is set to true, skipping import cluster logic.")
 		return cluster, nil
 	}
@@ -44,12 +39,12 @@ func ImportClusterIfEmpty(silent bool) (pkgtypes.Cluster, error) {
 
 	jsonData, err := json.Marshal(jsonString)
 	if err != nil {
-		return cluster, fmt.Errorf("error marshalling json: %s", err)
+		return cluster, fmt.Errorf("error marshalling json: %w", err)
 	}
 
 	err = json.Unmarshal([]byte(jsonData), &cluster)
 	if err != nil {
-		return cluster, fmt.Errorf("unable to cast cluster: %s", err)
+		return cluster, fmt.Errorf("unable to cast cluster: %w", err)
 	}
 
 	log.Info().Msgf("import cluster secret discovered for cluster %s", cluster.ClusterName)
@@ -68,9 +63,8 @@ func ImportClusterIfEmpty(silent bool) (pkgtypes.Cluster, error) {
 		log.Info().Msgf("inserted cluster record to db. adding default services. %s", cluster.ClusterName)
 
 		return cluster, nil
-	} else {
-		log.Info().Msgf("cluster record for %s already exists - skipping", cluster.ClusterName)
 	}
 
+	log.Info().Msgf("cluster record for %s already exists - skipping", cluster.ClusterName)
 	return pkgtypes.Cluster{}, nil
 }

@@ -16,7 +16,7 @@ import (
 // CheckKubefirstDir validate if ~/.k1 directory is ready to be used
 func CheckKubefirstDir(config *Config) error {
 	if _, err := os.Stat(config.K1FolderPath); err != nil {
-		return fmt.Errorf("unable to load \".k1\" directory, error is: %s", err)
+		return fmt.Errorf("unable to load \".k1\" directory, error is: %w", err)
 	}
 
 	log.Info().Msgf("\".k1\" directory found: %s", config.K1FolderPath)

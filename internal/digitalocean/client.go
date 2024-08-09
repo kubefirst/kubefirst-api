@@ -20,7 +20,7 @@ func NewDigitalocean(digitalOceanToken string) *godo.Client {
 }
 
 // ValidateRegion guarantees a region argument is valid
-func (c *DigitaloceanConfiguration) ValidateRegion(region string) error {
+func (c *Configuration) ValidateRegion(region string) error {
 	regions, _, err := c.Client.Regions.List(c.Context, &godo.ListOptions{})
 	if err != nil {
 		return err

@@ -26,7 +26,6 @@ import (
 	"github.com/kubefirst/kubefirst-api/internal/k8s"
 	"github.com/kubefirst/kubefirst-api/internal/secrets"
 	"github.com/kubefirst/kubefirst-api/pkg/providerConfigs"
-	pkgtypes "github.com/kubefirst/kubefirst-api/pkg/types"
 	"github.com/kubefirst/metrics-client/pkg/telemetry"
 	log "github.com/rs/zerolog/log"
 	"github.com/thanhpk/randstr"
@@ -41,7 +40,6 @@ func (clctrl *ClusterController) CreateCluster() error {
 	}
 
 	if !cl.CloudTerraformApplyCheck || cl.CloudTerraformApplyFailedCheck {
-
 		log.Info().Msg("creating aws cloud resources with terraform")
 		tfEntrypoint := clctrl.ProviderConfig.GitopsDir + fmt.Sprintf("/terraform/%s", clctrl.CloudProvider)
 		tfEnvs := map[string]string{}
@@ -62,7 +60,7 @@ func (clctrl *ClusterController) CreateCluster() error {
 			tfEnvs["TF_VAR_aws_account_id"] = *iamCaller.Account
 			tfEnvs["TF_VAR_use_ecr"] = strconv.FormatBool(clctrl.ECR) // Flag out the ecr terraform
 
-			clctrl.Cluster.AWSAccountId = *iamCaller.Account
+			clctrl.Cluster.AWSAccountID = *iamCaller.Account
 			err = secrets.UpdateCluster(clctrl.KubernetesClient, clctrl.Cluster)
 			if err != nil {
 				return err
@@ -133,7 +131,7 @@ func (clctrl *ClusterController) CreateTokens(kind string) interface{} {
 	case "gitops": // repo name
 
 		var externalDNSProviderTokenEnvName, externalDNSProviderSecretKey string
-		if clctrl.DnsProvider == "cloudflare" {
+		if clctrl.DNSProvider == "cloudflare" {
 			externalDNSProviderTokenEnvName = "CF_API_TOKEN"
 			externalDNSProviderSecretKey = "cf-api-token"
 		} else {
@@ -215,10 +213,10 @@ func (clctrl *ClusterController) CreateTokens(kind string) interface{} {
 			GitopsRepoNoHTTPSURL:                       fmt.Sprintf("%s/%s/gitops.git", clctrl.GitHost, clctrl.GitAuth.Owner),
 			WorkloadClusterTerraformModuleURL:          fmt.Sprintf("git::https://%s/%s/gitops.git//terraform/%s/modules/workload-cluster?ref=main", clctrl.GitHost, clctrl.GitAuth.Owner, clctrl.CloudProvider),
 			WorkloadClusterBootstrapTerraformModuleURL: fmt.Sprintf("git::https://%s/%s/gitops.git//terraform/%s/modules/bootstrap?ref=main", clctrl.GitHost, clctrl.GitAuth.Owner, clctrl.CloudProvider),
-			ClusterId: clctrl.ClusterID,
+			ClusterID: clctrl.ClusterID,
 
 			// external-dns optionality to provide cloudflare support regardless of cloud provider
-			ExternalDNSProviderName:         clctrl.DnsProvider,
+			ExternalDNSProviderName:         clctrl.DNSProvider,
 			ExternalDNSProviderTokenEnvName: externalDNSProviderTokenEnvName,
 			ExternalDNSProviderSecretName:   fmt.Sprintf("%s-auth", clctrl.CloudProvider),
 			ExternalDNSProviderSecretKey:    externalDNSProviderSecretKey,
@@ -232,11 +230,11 @@ func (clctrl *ClusterController) CreateTokens(kind string) interface{} {
 			gitopsTemplateTokens.StateStoreBucketHostname = cl.StateStoreDetails.Hostname
 		case "google":
 			gitopsTemplateTokens.GoogleAuth = clctrl.GoogleAuth.KeyFile
-			gitopsTemplateTokens.GoogleProject = clctrl.GoogleAuth.ProjectId
+			gitopsTemplateTokens.GoogleProject = clctrl.GoogleAuth.ProjectID
 			gitopsTemplateTokens.GoogleUniqueness = strings.ToLower(randstr.String(5))
 			gitopsTemplateTokens.ForceDestroy = strconv.FormatBool(true) // TODO make this optional
 			gitopsTemplateTokens.KubefirstArtifactsBucket = clctrl.KubefirstStateStoreBucketName
-			gitopsTemplateTokens.VaultDataBucketName = fmt.Sprintf("%s-vault-data-%s", clctrl.GoogleAuth.ProjectId, clctrl.ClusterName)
+			gitopsTemplateTokens.VaultDataBucketName = fmt.Sprintf("%s-vault-data-%s", clctrl.GoogleAuth.ProjectID, clctrl.ClusterName)
 		case "aws":
 			iamCaller, err := clctrl.AwsClient.GetCallerIdentity()
 			if err != nil {
@@ -262,7 +260,7 @@ func (clctrl *ClusterController) CreateTokens(kind string) interface{} {
 		case "k3s":
 			gitopsTemplateTokens.K3sServersPrivateIps = clctrl.K3sAuth.K3sServersPrivateIps
 			gitopsTemplateTokens.K3sServersPublicIps = clctrl.K3sAuth.K3sServersPublicIps
-			gitopsTemplateTokens.SshUser = clctrl.K3sAuth.K3sSshUser
+			gitopsTemplateTokens.SSHUser = clctrl.K3sAuth.K3sSSHUser
 			gitopsTemplateTokens.K3sServersArgs = clctrl.K3sAuth.K3sServersArgs
 		}
 
@@ -307,7 +305,7 @@ func (clctrl *ClusterController) ClusterSecretsBootstrap() error {
 	clientSet := kcfg.Clientset
 
 	// create namespaces
-	err = providerConfigs.K8sNamespaces(clientSet)
+	err = providerConfigs.Namespaces(clientSet)
 	if err != nil {
 		return err
 	}
@@ -369,12 +367,7 @@ func (clctrl *ClusterController) ClusterSecretsBootstrap() error {
 			}
 		}
 
-		// create service accounts
-		var token string
-		if (clctrl.CloudflareAuth != pkgtypes.CloudflareAuth{}) {
-			token = clctrl.CloudflareAuth.APIToken
-		}
-		err = providerConfigs.ServiceAccounts(clientSet, token)
+		err = providerConfigs.ServiceAccounts(clientSet)
 		if err != nil {
 			return err
 		}

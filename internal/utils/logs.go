@@ -23,14 +23,14 @@ func InitializeLogs(fileName string) error {
 	}
 	k1Dir := fmt.Sprintf("%s/.k1", homePath)
 
-	//* create log directory
+	// * create log directory
 	logsFolder := fmt.Sprintf("%s/logs", k1Dir)
-	_ = os.Mkdir(logsFolder, 0700)
+	_ = os.Mkdir(logsFolder, 0o700)
 	if err != nil {
-		return fmt.Errorf("error creating logs directory: %s", err)
+		return fmt.Errorf("error creating logs directory: %w", err)
 	}
 
-	//* create session log file
+	// * create session log file
 	logfile := fmt.Sprintf("%s/%s", logsFolder, fileName)
 	logFileObj, err := pkg.OpenLogFile(logfile)
 	if err != nil {

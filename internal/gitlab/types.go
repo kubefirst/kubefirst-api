@@ -8,9 +8,9 @@ package gitlab
 
 import "github.com/xanzy/go-gitlab"
 
-// GitLabWrapper holds gitlab cloud client info and provides and interface
+// Wrapper holds gitlab cloud client info and provides and interface
 // to its functions
-type GitLabWrapper struct {
+type Wrapper struct {
 	Client          *gitlab.Client
 	ParentGroupID   int
 	ParentGroupPath string

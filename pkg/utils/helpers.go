@@ -9,7 +9,7 @@ import (
 )
 
 func randSeq(n int) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxy")
+	letters := []rune("abcdefghijklmnopqrstuvwxy")
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]
@@ -23,16 +23,20 @@ func Random(seq int) string {
 }
 
 // internal exports
-var IsAppAvailable = internal.IsAppAvailable
-var GenerateClusterID = internal.GenerateClusterID
-var GetAvailableDiskSize = internal.GetAvailableDiskSize
-var OpenBrowser = internal.OpenBrowser
-var ResetK1Dir = internal.ResetK1Dir
-var SetupViper = internal.SetupViper
-var OpenLogFile = internal.OpenLogFile
+var (
+	IsAppAvailable       = internal.IsAppAvailable
+	GenerateClusterID    = internal.GenerateClusterID
+	GetAvailableDiskSize = internal.GetAvailableDiskSize
+	OpenBrowser          = internal.OpenBrowser
+	ResetK1Dir           = internal.ResetK1Dir
+	SetupViper           = internal.SetupViper
+	OpenLogFile          = internal.OpenLogFile
+)
 
 // helper exports
-var DisplayLogHints = helpers.DisplayLogHints
-var TestEndpointTLS = helpers.TestEndpointTLS
-var SetClusterStatusFlags = helpers.SetClusterStatusFlags
-var GetClusterStatusFlags = helpers.GetClusterStatusFlags
+var (
+	DisplayLogHints       = helpers.DisplayLogHints
+	TestEndpointTLS       = helpers.TestEndpointTLS
+	SetClusterStatusFlags = helpers.SetClusterStatusFlags
+	GetClusterStatusFlags = helpers.GetClusterStatusFlags
+)

@@ -12,14 +12,14 @@ import (
 	"github.com/vultr/govultr/v3"
 )
 
-type VultrConfiguration struct {
+type Configuration struct {
 	Client              *govultr.Client
 	Context             context.Context
 	Region              string
 	ObjectStorageRegion string
 }
 
-type VultrBucketCredentials struct {
+type BucketCredentials struct {
 	AccessKey       string
 	SecretAccessKey string
 	Endpoint        string

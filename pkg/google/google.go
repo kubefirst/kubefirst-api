@@ -21,17 +21,17 @@ import (
 )
 
 // GetRegions lists all available regions
-func (conf *GoogleConfiguration) GetRegions() ([]string, error) {
+func (conf *Configuration) GetRegions() ([]string, error) {
 	var regionList []string
 
 	creds, err := google.CredentialsFromJSON(conf.Context, []byte(conf.KeyFile), secretmanager.DefaultAuthScopes()...)
 	if err != nil {
-		return nil, fmt.Errorf("could not create google storage client credentials: %s", err)
+		return nil, fmt.Errorf("could not create google storage client credentials: %w", err)
 	}
 
 	client, err := compute.NewRegionsRESTClient(conf.Context, option.WithCredentials(creds))
 	if err != nil {
-		return []string{}, fmt.Errorf("could not create google compute client: %s", err)
+		return []string{}, fmt.Errorf("could not create google compute client: %w", err)
 	}
 	defer client.Close()
 
@@ -48,23 +48,23 @@ func (conf *GoogleConfiguration) GetRegions() ([]string, error) {
 		if err != nil {
 			return []string{}, err
 		}
-		regionList = append(regionList, *pair.Name)
+		regionList = append(regionList, pair.GetName())
 	}
 
 	return regionList, nil
 }
 
-func (conf *GoogleConfiguration) GetZones() ([]string, error) {
+func (conf *Configuration) GetZones() ([]string, error) {
 	var zoneList []string
 
 	creds, err := google.CredentialsFromJSON(conf.Context, []byte(conf.KeyFile), secretmanager.DefaultAuthScopes()...)
 	if err != nil {
-		return nil, fmt.Errorf("could not create google storage client credentials: %s", err)
+		return nil, fmt.Errorf("could not create google storage client credentials: %w", err)
 	}
 
 	client, err := compute.NewZonesRESTClient(conf.Context, option.WithCredentials(creds))
 	if err != nil {
-		return nil, fmt.Errorf("could not create google compute client: %s", err)
+		return nil, fmt.Errorf("could not create google compute client: %w", err)
 	}
 	defer client.Close()
 
@@ -81,7 +81,7 @@ func (conf *GoogleConfiguration) GetZones() ([]string, error) {
 		if err != nil {
 			return []string{}, err
 		}
-		zoneList = append(zoneList, *pair.Name)
+		zoneList = append(zoneList, pair.GetName())
 	}
 
 	return zoneList, nil

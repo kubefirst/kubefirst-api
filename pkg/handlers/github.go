@@ -9,6 +9,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,7 +27,7 @@ import (
 type GitHubDeviceFlow struct {
 	DeviceCode      string `json:"device_code"`
 	UserCode        string `json:"user_code"`
-	VerificationUri string `json:"verification_uri"`
+	VerificationURI string `json:"verification_uri"`
 	ExpiresIn       int    `json:"expires_in"`
 	Interval        int    `json:"interval"`
 }
@@ -55,11 +56,10 @@ func NewGitHubHandler(gitHubService *services.GitHubService) *GitHubHandler {
 // waits for the user authorize the request in the browser, then it pool GitHub access point endpoint, to validate and
 // grant permission to return a valid access token.
 func (handler GitHubHandler) AuthenticateUser() (string, error) {
-
 	gitHubDeviceFlowCodeURL := "https://github.com/login/device/code"
 	// todo: update scope list, we have more than we need at the moment
 	requestBody, err := json.Marshal(map[string]string{
-		"client_id": pkg.GitHubOAuthClientId,
+		"client_id": pkg.GitHubOAuthClientID,
 		"scope":     "repo public_repo admin:repo_hook admin:org admin:public_key admin:org_hook user project delete_repo write:packages admin:gpg_key workflow",
 	})
 	if err != nil {
@@ -93,7 +93,7 @@ func (handler GitHubHandler) AuthenticateUser() (string, error) {
 	// todo: check http code
 
 	// UI update to the user adding instructions how to proceed
-	gitHubTokenReport := printGitHubAuthToken(gitHubDeviceFlow.UserCode, gitHubDeviceFlow.VerificationUri)
+	gitHubTokenReport := printGitHubAuthToken(gitHubDeviceFlow.UserCode, gitHubDeviceFlow.VerificationURI)
 	fmt.Println(reports.StyleMessage(gitHubTokenReport))
 
 	// // this blocks the progress until the user hits enter to open the browser
@@ -107,8 +107,8 @@ func (handler GitHubHandler) AuthenticateUser() (string, error) {
 	}
 
 	var gitHubAccessToken string
-	var attempts = 18       // 18 * 5 = 90 seconds
-	var secondsControl = 95 // 95 to start with 95-5=90
+	attempts := 18       // 18 * 5 = 90 seconds
+	secondsControl := 95 // 95 to start with 95-5=90
 	for i := 0; i < attempts; i++ {
 		gitHubAccessToken, err = handler.service.CheckUserCodeConfirmation(gitHubDeviceFlow.DeviceCode)
 		if err != nil {
@@ -131,7 +131,6 @@ func (handler GitHubHandler) AuthenticateUser() (string, error) {
 
 // todo: make it a method
 func (handler GitHubHandler) GetGitHubUser(gitHubAccessToken string) (string, error) {
-
 	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/user", nil)
 	if err != nil {
 		log.Warn().Msg("error setting request")
@@ -167,12 +166,11 @@ func (handler GitHubHandler) GetGitHubUser(gitHubAccessToken string) (string, er
 	}
 
 	if len(githubUser.Login) == 0 {
-		return "", fmt.Errorf("unable to retrieve username via GitHub API")
+		return "", errors.New("unable to retrieve username via GitHub API")
 	}
 
 	log.Info().Msgf("GitHub user: %s", githubUser.Login)
 	return githubUser.Login, nil
-
 }
 
 func (handler GitHubHandler) CheckGithubOrganizationPermissions(githubToken, githubOwner, githubUsername string) error {
@@ -214,21 +212,20 @@ func (handler GitHubHandler) CheckGithubOrganizationPermissions(githubToken, git
 
 	if gitHubOrganizationRole.Role != "admin" {
 		errMsg := fmt.Sprintf("Authenticated user (via GITHUB_TOKEN) doesn't have adequate permissions.\n Make sure they are an `Owner` in %s.\n Current role: %s", githubOwner, gitHubOrganizationRole.Role)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	return nil
-
 }
 
-func printGitHubAuthToken(userCode, verificationUri string) string {
+func printGitHubAuthToken(userCode, verificationURI string) string {
 	var gitHubTokenReport bytes.Buffer
 	gitHubTokenReport.WriteString(strings.Repeat("-", 69))
 	gitHubTokenReport.WriteString("\nNo GITHUB_TOKEN env variable found!\nUse the code below to get a temporary GitHub Access Token\nThis token will be used by Kubefirst to create your environment\n")
 	gitHubTokenReport.WriteString("\n\nA GitHub Access Token is required to provision GitHub repositories and run workflows in GitHub.\n")
 	gitHubTokenReport.WriteString(strings.Repeat("-", 69) + "\n")
 	gitHubTokenReport.WriteString("1. Copy this code: 📋 " + userCode + " 📋\n\n")
-	gitHubTokenReport.WriteString(fmt.Sprintf("2. When ready, press <enter> to open the page at %s\n\n", verificationUri))
+	gitHubTokenReport.WriteString(fmt.Sprintf("2. When ready, press <enter> to open the page at %s\n\n", verificationURI))
 	gitHubTokenReport.WriteString("3. Authorize the organization you'll be using Kubefirst with - this may also be your personal account")
 
 	return gitHubTokenReport.String()

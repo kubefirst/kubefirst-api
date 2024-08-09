@@ -4,7 +4,7 @@ Copyright (C) 2021-2023, Kubefirst
 This program is licensed under MIT.
 See the LICENSE file for more details.
 */
-package gitShim
+package gitShim //nolint:revive // allowed during code reorg
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ func PullWithAuth(repo *git.Repository, remote string, branch string, auth trans
 		Auth:          auth,
 	})
 	if err != nil {
-		return fmt.Errorf("error during git pull: %s", err)
+		return fmt.Errorf("error during git pull: %w", err)
 	}
 
 	return nil
@@ -48,7 +48,7 @@ func PrepareMgmtCluster(cluster pkgtypes.Cluster) error {
 	gitopsDir := fmt.Sprintf("%s/.k1/%s/gitops", homeDir, cluster.ClusterName)
 
 	if _, err := os.Stat(clusterDir); os.IsNotExist(err) {
-		err := os.MkdirAll(clusterDir, 0777)
+		err := os.MkdirAll(clusterDir, 0o777)
 		if err != nil {
 			log.Fatal().Msgf("error creating home dir: %s", err)
 			return err
@@ -64,23 +64,15 @@ func PrepareMgmtCluster(cluster pkgtypes.Cluster) error {
 	err = gitClient.AddRemote(fmt.Sprintf("https://%s/%s/gitops", cluster.GitHost, cluster.GitAuth.Owner), cluster.GitProvider, gitopsRepo)
 	if err != nil {
 		log.Fatal().Msgf("error cloning repository: %s", err)
-
 		return err
-	}
-
-	if err != nil {
-		log.Fatal().Msgf("error cloning repository: %s", err)
-		return err
-
 	}
 
 	return nil
 }
 
 func PrepareGitEnvironment(cluster *pkgtypes.Cluster, gitopsDir string) error {
-
-	repoUrl := fmt.Sprintf("https://%s/%s/gitops", cluster.GitHost, cluster.GitAuth.Owner)
-	_, err := gitClient.ClonePrivateRepo("main", gitopsDir, repoUrl, cluster.GitAuth.User, cluster.GitAuth.Token)
+	repoURL := fmt.Sprintf("https://%s/%s/gitops", cluster.GitHost, cluster.GitAuth.Owner)
+	_, err := gitClient.ClonePrivateRepo("main", gitopsDir, repoURL, cluster.GitAuth.User, cluster.GitAuth.Token)
 	if err != nil {
 		log.Fatal().Msgf("error cloning repository: %s", err)
 
@@ -91,8 +83,8 @@ func PrepareGitEnvironment(cluster *pkgtypes.Cluster, gitopsDir string) error {
 }
 
 func PrepareGitOpsCatalog(gitopsCatalogDir string) error {
-	repoUrl := fmt.Sprintf("https://github.com/%s/%s", KubefirstGitHubOrganization, KubefirstGitopsCatalogRepository)
-	_, err := gitClient.Clone("main", gitopsCatalogDir, repoUrl)
+	repoURL := fmt.Sprintf("https://github.com/%s/%s", KubefirstGitHubOrganization, KubefirstGitopsCatalogRepository)
+	_, err := gitClient.Clone("main", gitopsCatalogDir, repoURL)
 	if err != nil {
 		log.Fatal().Msgf("error cloning repository: %s", err)
 

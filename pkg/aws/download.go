@@ -18,7 +18,6 @@ import (
 )
 
 func DownloadTools(awsConfig *providerConfigs.ProviderConfig, kubectlClientVersion string, terraformClientVersion string) error {
-
 	log.Info().Msg("starting downloads...")
 
 	// create folder if it doesn't exist
@@ -35,7 +34,6 @@ func DownloadTools(awsConfig *providerConfigs.ProviderConfig, kubectlClientVersi
 	wg.Add(2)
 
 	go func() {
-
 		kubectlDownloadURL := fmt.Sprintf(
 			"https://dl.k8s.io/release/%s/bin/%s/%s/kubectl",
 			kubectlClientVersion,
@@ -49,7 +47,7 @@ func DownloadTools(awsConfig *providerConfigs.ProviderConfig, kubectlClientVersi
 			return
 		}
 
-		err = os.Chmod(awsConfig.KubectlClient, 0755)
+		err = os.Chmod(awsConfig.KubectlClient, 0o755)
 		if err != nil {
 			errorChannel <- err
 			return
@@ -66,7 +64,6 @@ func DownloadTools(awsConfig *providerConfigs.ProviderConfig, kubectlClientVersi
 	}()
 
 	go func() {
-
 		terraformDownloadURL := fmt.Sprintf(
 			"https://releases.hashicorp.com/terraform/%s/terraform_%s_%s_%s.zip",
 			terraformClientVersion,
@@ -84,13 +81,13 @@ func DownloadTools(awsConfig *providerConfigs.ProviderConfig, kubectlClientVersi
 
 		downloadManager.Unzip(terraformDownloadZipPath, awsConfig.ToolsDir)
 
-		err = os.Chmod(awsConfig.ToolsDir, 0777)
+		err = os.Chmod(awsConfig.ToolsDir, 0o777)
 		if err != nil {
 			errorChannel <- err
 			return
 		}
 
-		err = os.Chmod(fmt.Sprintf("%s/terraform", awsConfig.ToolsDir), 0755)
+		err = os.Chmod(fmt.Sprintf("%s/terraform", awsConfig.ToolsDir), 0o755)
 		if err != nil {
 			errorChannel <- err
 			return

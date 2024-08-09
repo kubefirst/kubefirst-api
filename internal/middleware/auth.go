@@ -18,7 +18,6 @@ import (
 
 // ValidateAPIKey determines whether or not a request is authenticated with a valid API key
 func ValidateAPIKey() gin.HandlerFunc {
-
 	return func(c *gin.Context) {
 		APIKey := strings.TrimPrefix(c.Request.Header.Get("Authorization"), "Bearer ")
 

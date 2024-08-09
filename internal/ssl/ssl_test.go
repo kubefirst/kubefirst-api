@@ -74,5 +74,4 @@ func TestArgoCertificateIntegration(t *testing.T) {
 			}
 		})
 	}
-
 }

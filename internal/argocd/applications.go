@@ -10,12 +10,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	v1alpha1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	health "github.com/argoproj/gitops-engine/pkg/health"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
 )
@@ -24,8 +26,8 @@ const (
 	applicationDeletionTimeout int = 120
 )
 
-// ArgoCDApplicationCleanup removes and waits for specific ArgoCD applications
-func ArgoCDApplicationCleanup(clientset kubernetes.Interface, removeApps []string) error {
+// ApplicationCleanup removes and waits for specific ArgoCD applications
+func ApplicationCleanup(clientset kubernetes.Interface, removeApps []string) error {
 	// Patch registry app to remove syncPolicy
 	removeSyncPolicyPatch, _ := json.Marshal(
 		[]PatchStringValue{{
@@ -35,16 +37,18 @@ func ArgoCDApplicationCleanup(clientset kubernetes.Interface, removeApps []strin
 		}})
 	err := RestPatchArgoCD(clientset, "registry", removeSyncPolicyPatch)
 	if err != nil {
-		log.Warn().Msgf("could not remove syncPolicy from registry, it may already be disabled")
+		log.Error().Msgf("unable to patch registry application: %s", err)
+		return fmt.Errorf("unable to patch registry application: %w", err)
 	}
+
 	log.Info().Msgf("removed syncPolicy from registry application or it was already disabled")
 
 	// Patch dependent applications to remove syncPolicy}
 	for _, app := range removeApps {
 		log.Info().Msgf("attempting to delete argocd application %s", app)
-		err := waitForApplicationDeletion(clientset, app)
-		if err != nil {
+		if err := waitForApplicationDeletion(clientset, app); err != nil {
 			log.Error().Msgf("error deleting argocd application %q: %s", app, err)
+			return fmt.Errorf("error deleting argocd application %q: %w", app, err)
 		}
 	}
 
@@ -61,15 +65,17 @@ func deleteArgoCDApplicationV2(clientset kubernetes.Interface, applicationName s
 		Name(applicationName).
 		DoRaw(context.Background())
 	if err != nil {
-		log.Error().Msgf("error deleting argocd application: %s", err)
+		log.Error().Msgf("error deleting argocd application %q: %s", applicationName, err)
+		return fmt.Errorf("error deleting argocd application %q: %w", applicationName, err)
 	}
 
 	// Unmarshal JSON API response to map[string]interface{}
 	var resp map[string]interface{}
 	if err := json.Unmarshal(data, &resp); err != nil {
-		log.Error().Msgf("error deleting argocd application: %s", err)
-		return err
+		log.Error().Msgf("unable to encode ArgoCD application data to JSON: %s", err.Error())
+		return fmt.Errorf("unable to encode ArgoCD application data to JSON: %w", err)
 	}
+
 	log.Info().Msgf("deleting %s: %s", applicationName, strings.ToLower(fmt.Sprintf("%v", resp["status"])))
 
 	for i := 0; i < applicationDeletionTimeout; i++ {
@@ -122,24 +128,25 @@ func RefreshRegistryApplication(host string, token string) error {
 // RefreshApplication forces the registry application to fetch upstream manifests
 func RefreshApplication(host string, token string, appName string) error {
 	// Build request to ArgoCD API
-	request, err := http.NewRequest(
-		http.MethodGet,
-		fmt.Sprintf("%s/api/v1/applications/%s?refresh=true", host, appName),
-		nil,
-	)
+	endpoint := fmt.Sprintf("%s/api/v1/applications/%s?refresh=true", host, appName)
+	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating request to refresh application %s: %w", appName, err)
 	}
+
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	// Submit request to ArgoCD API
-	client := &http.Client{Timeout: 10 * time.Second}
-	response, err := client.Do(request)
+	response, err := httpCommon.CustomHTTPClient(false).Do(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("error sending request to refresh application %s: %w", appName, err)
 	}
 	defer response.Body.Close()
+
+	if _, err := io.Copy(io.Discard, response.Body); err != nil {
+		return fmt.Errorf("error reading response body for application %s: %w", appName, err)
+	}
 
 	return nil
 }
@@ -154,19 +161,18 @@ func returnArgoCDApplicationStatus(clientset kubernetes.Interface, applicationNa
 		Name(applicationName).
 		DoRaw(context.Background())
 	if err != nil {
-		log.Error().Msgf("error retrieving argocd applications: %s", err)
-		return health.HealthStatusUnknown, err
+		log.Error().Msgf("error retrieving argocd application %q: %s", applicationName, err)
+		return health.HealthStatusUnknown, fmt.Errorf("error retrieving argocd application %q: %w", applicationName, err)
 	}
 
 	// Unmarshal JSON API response to map[string]interface{}
-	var resp *v1alpha1.Application
+	var resp v1alpha1.Application
 	if err := json.Unmarshal(data, &resp); err != nil {
-		log.Error().Msgf("error converting argocd application data: %s", err)
-		return health.HealthStatusUnknown, err
+		log.Error().Msgf("error converting argocd application data to v1alpha1.Application: %s", err)
+		return health.HealthStatusUnknown, fmt.Errorf("error converting argocd application data to v1alpha1.Application: %w", err)
 	}
-	status := resp.Status.Health.Status
 
-	return status, nil
+	return resp.Status.Health.Status, nil
 }
 
 // waitForApplicationDeletion disables sync and deletes specific applications
@@ -183,7 +189,9 @@ func waitForApplicationDeletion(clientset kubernetes.Interface, applicationName 
 	err := RestPatchArgoCD(clientset, applicationName, removeSyncPolicyPatch)
 	if err != nil {
 		log.Info().Msgf("error patching argocd application %s: %s", applicationName, err)
+		return fmt.Errorf("error patching argocd application %s: %w", applicationName, err)
 	}
+
 	log.Info().Msgf("removed syncPolicy from argocd application %s or it was not present", applicationName)
 
 	// Delete applications and wait for them to report as deleted
@@ -192,7 +200,7 @@ func waitForApplicationDeletion(clientset kubernetes.Interface, applicationName 
 		select {
 		case deleted, ok := <-ch:
 			if !ok || deleted {
-				fmt.Printf("deleted argocd application %s if it existed\n", applicationName)
+				log.Info().Msgf("deleted argocd application %s if it existed", applicationName)
 				return nil
 			}
 		case <-time.After(time.Duration(applicationDeletionTimeout) * time.Second):

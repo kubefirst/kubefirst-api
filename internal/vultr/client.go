@@ -13,10 +13,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func NewVultr(vultrApiKey string) *govultr.Client {
+func NewVultr(vultrAPIKey string) *govultr.Client {
 	config := &oauth2.Config{}
 	ctx := context.Background()
-	ts := config.TokenSource(ctx, &oauth2.Token{AccessToken: vultrApiKey})
+	ts := config.TokenSource(ctx, &oauth2.Token{AccessToken: vultrAPIKey})
 	vultrClient := govultr.NewClient(oauth2.NewClient(ctx, ts))
 
 	return vultrClient

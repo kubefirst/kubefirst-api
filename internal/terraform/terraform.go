@@ -60,7 +60,7 @@ func InitDestroyAutoApprove(terraformClientPath string, tfEntrypoint string, tfE
 }
 
 // todo need to write something that outputs -json type and can get multiple values
-func OutputSingleValue(terraformClientPath string, directory, tfEntrypoint, outputName string) {
+func OutputSingleValue(terraformClientPath string, directory, outputName string) {
 	os.Chdir(directory)
 
 	var tfOutput bytes.Buffer

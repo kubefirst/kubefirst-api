@@ -14,7 +14,6 @@ import (
 )
 
 func TestRemoveSubDomain(t *testing.T) {
-
 	type args struct {
 		domain string
 	}
@@ -76,7 +75,6 @@ func TestRemoveSubDomain(t *testing.T) {
 }
 
 func TestRemoveSubDomainV2(t *testing.T) {
-
 	type args struct {
 		domain string
 	}
@@ -206,7 +204,6 @@ func TestValidateK1Folder(t *testing.T) {
 }
 
 func TestGetFileContent(t *testing.T) {
-
 	file, err := os.CreateTemp("", "testing.txt")
 	if err != nil {
 		t.Error(err)

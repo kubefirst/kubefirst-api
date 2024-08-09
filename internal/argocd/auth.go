@@ -8,112 +8,56 @@ package argocd
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	pkg "github.com/kubefirst/kubefirst-api/internal"
 	"github.com/kubefirst/kubefirst-api/internal/argocdModel"
-	"github.com/rs/zerolog/log"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 )
+
+func getToken(endpoint, username, password string) (string, error) {
+	httpClient := httpCommon.CustomHTTPClient(true)
+	argoCDConfig := argocdModel.SessionSessionCreateRequest{
+		Username: username,
+		Password: password,
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(argoCDConfig); err != nil {
+		return "", fmt.Errorf("unable to encode argocd config to JSON: %w", err)
+	}
+
+	res, err := httpClient.Post(endpoint, "application/json", &buf)
+	if err != nil {
+		return "", fmt.Errorf("unable to retrieve argocd token: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unable to retrieve argocd token: status code was %d", res.StatusCode)
+	}
+
+	var response struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return "", fmt.Errorf("unable to decode argocd token response: %w", err)
+	}
+
+	return response.Token, nil
+}
 
 // GetArgoCDToken expects ArgoCD username and password, and returns a ArgoCD Bearer Token. ArgoCD username and password
 // are stored in the viper file.
 func GetArgoCDToken(username string, password string) (string, error) {
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	httpClient := http.Client{Transport: customTransport}
-
 	url := pkg.ArgoCDLocalBaseURL + "/session"
-
-	argoCDConfig := argocdModel.SessionSessionCreateRequest{
-		Username: username,
-		Password: password,
-	}
-
-	payload, err := json.Marshal(argoCDConfig)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return "", err
-	}
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unable to retrieve argocd token")
-	}
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var jsonReturn map[string]interface{}
-	err = json.Unmarshal(body, &jsonReturn)
-	if err != nil {
-		return "", err
-	}
-	token := fmt.Sprintf("%v", jsonReturn["token"])
-	if len(token) == 0 {
-		return "", fmt.Errorf("unable to retrieve argocd token, make sure provided credentials are valid")
-	}
-
-	return token, nil
+	return getToken(url, username, password)
 }
 
 // GetArgocdTokenV2
-func GetArgocdTokenV2(httpClient *http.Client, argocdBaseURL string, username string, password string) (string, error) {
-	log.Info().Msgf("using argocd url %s", argocdBaseURL)
-
+func GetArgocdTokenV2(argocdBaseURL string, username string, password string) (string, error) {
 	url := argocdBaseURL + "/api/v1/session"
-
-	argoCDConfig := argocdModel.SessionSessionCreateRequest{
-		Username: username,
-		Password: password,
-	}
-
-	payload, err := json.Marshal(argoCDConfig)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return "", err
-	}
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unable to retrieve argocd token")
-	}
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var jsonReturn map[string]interface{}
-	err = json.Unmarshal(body, &jsonReturn)
-	if err != nil {
-		return "", err
-	}
-	token := fmt.Sprintf("%v", jsonReturn["token"])
-	if len(token) == 0 {
-		return "", fmt.Errorf("unable to retrieve argocd token, make sure provided credentials are valid")
-	}
-
-	return token, nil
+	return getToken(url, username, password)
 }

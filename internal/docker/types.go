@@ -8,6 +8,6 @@ package docker
 
 import "github.com/docker/docker/client"
 
-type DockerClientWrapper struct {
+type ClientWrapper struct {
 	Client *client.Client
 }

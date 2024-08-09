@@ -12,7 +12,7 @@ import (
 	cloudflare "github.com/cloudflare/cloudflare-go"
 )
 
-type CloudflareConfiguration struct {
+type Configuration struct {
 	Client  *cloudflare.API
 	Context context.Context
 }

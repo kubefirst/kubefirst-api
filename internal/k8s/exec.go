@@ -8,6 +8,7 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -45,12 +46,12 @@ func ReadConfigMapV2(kubeConfigPath string, namespace string, configMapName stri
 	}
 	configMap, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
 	if err != nil {
-		return map[string]string{}, fmt.Errorf("error getting ConfigMap: %s", err)
+		return map[string]string{}, fmt.Errorf("error getting ConfigMap: %w", err)
 	}
 
 	parsedSecretData := make(map[string]string)
 	for key, value := range configMap.Data {
-		parsedSecretData[key] = string(value)
+		parsedSecretData[key] = value
 	}
 
 	return parsedSecretData, nil
@@ -162,7 +163,6 @@ func podExec(kubeConfigPath string, ps *PodSessionOptions, pe v1.PodExecOptions,
 
 // ReturnDeploymentObject returns a matching appsv1.Deployment object based on the filters
 func ReturnDeploymentObject(clientset *kubernetes.Clientset, matchLabel string, matchLabelValue string, namespace string, timeoutSeconds int) (*appsv1.Deployment, error) {
-
 	// Filter
 	deploymentListOptions := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", matchLabel, matchLabelValue),
@@ -188,8 +188,10 @@ func ReturnDeploymentObject(clientset *kubernetes.Clientset, matchLabel string, 
 			if !ok {
 				// Error if the channel closes
 				log.Error().Msgf("error waiting for %s Deployment to be created: %s", matchLabelValue, err)
-				return nil, fmt.Errorf("error waiting for %s Deployment to be created: %s", matchLabelValue, err)
+				return nil, fmt.Errorf("error waiting for %s Deployment to be created: %w", matchLabelValue, err)
 			}
+
+			//nolint:forcetypeassert // we are confident this is a Deployment
 			if event.
 				Object.(*appsv1.Deployment).Status.Replicas > 0 {
 				spec, err := clientset.AppsV1().Deployments(namespace).List(context.Background(), deploymentListOptions)
@@ -201,14 +203,13 @@ func ReturnDeploymentObject(clientset *kubernetes.Clientset, matchLabel string, 
 			}
 		case <-time.After(time.Duration(timeoutSeconds) * time.Second):
 			log.Error().Msg("the Deployment was not created within the timeout period")
-			return nil, fmt.Errorf("the Deployment was not created within the timeout period")
+			return nil, errors.New("the Deployment was not created within the timeout period")
 		}
 	}
 }
 
 // ReturnPodObject returns a matching v1.Pod object based on the filters
 func ReturnPodObject(kubeConfigPath string, matchLabel string, matchLabelValue string, namespace string, timeoutSeconds int) (*v1.Pod, error) {
-
 	clientset, err := GetClientSet(kubeConfigPath)
 	if err != nil {
 		return nil, err
@@ -240,6 +241,8 @@ func ReturnPodObject(kubeConfigPath string, matchLabel string, matchLabelValue s
 				log.Error().Msgf("error waiting for %s Pod to be created: %s", matchLabelValue, err)
 				return nil, err
 			}
+
+			//nolint:forcetypeassert // we are confident this is a Pod
 			if event.
 				Object.(*v1.Pod).Status.Phase == "Pending" {
 				spec, err := clientset.CoreV1().Pods(namespace).List(context.Background(), podListOptions)
@@ -249,6 +252,8 @@ func ReturnPodObject(kubeConfigPath string, matchLabel string, matchLabelValue s
 				}
 				return &spec.Items[0], nil
 			}
+
+			//nolint:forcetypeassert // we are confident this is a Pod
 			if event.
 				Object.(*v1.Pod).Status.Phase == "Running" {
 				spec, err := clientset.CoreV1().Pods(namespace).List(context.Background(), podListOptions)
@@ -267,7 +272,6 @@ func ReturnPodObject(kubeConfigPath string, matchLabel string, matchLabelValue s
 
 // ReturnStatefulSetObject returns a matching appsv1.StatefulSet object based on the filters
 func ReturnStatefulSetObject(clientset *kubernetes.Clientset, matchLabel string, matchLabelValue string, namespace string, timeoutSeconds int) (*appsv1.StatefulSet, error) {
-
 	// Filter
 	statefulSetListOptions := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", matchLabel, matchLabelValue),
@@ -440,7 +444,7 @@ func WaitForStatefulSetReady(clientset *kubernetes.Clientset, statefulset *appsv
 
 					// Determine when the Pods are running
 					for _, pod := range pods.Items {
-						err := watchForStatefulSetPodReady(clientset, statefulset.Namespace, statefulset.Name, pod.Name, timeoutSeconds)
+						err := watchForStatefulSetPodReady(clientset, statefulset.Namespace, pod.Name, timeoutSeconds)
 						if err != nil {
 							log.Error().Msgf(err.Error())
 							return false, err
@@ -450,14 +454,10 @@ func WaitForStatefulSetReady(clientset *kubernetes.Clientset, statefulset *appsv
 					objWatch.Stop()
 					return true, nil
 				}
-			} else {
-				// Under normal circumstances, once all Pods are ready
-				// return success
-				if event.Object.(*appsv1.StatefulSet).Status.AvailableReplicas == configuredReplicas {
-					log.Info().Msgf("All Pods in StatefulSet %s are ready.", statefulset.Name)
-					objWatch.Stop()
-					return true, nil
-				}
+			} else if event.Object.(*appsv1.StatefulSet).Status.AvailableReplicas == configuredReplicas {
+				log.Info().Msgf("All Pods in StatefulSet %s are ready.", statefulset.Name)
+				objWatch.Stop()
+				return true, nil
 			}
 		case <-time.After(time.Duration(timeoutSeconds) * time.Second):
 			log.Error().Msg("the StatefulSet was not ready within the timeout period")
@@ -469,7 +469,7 @@ func WaitForStatefulSetReady(clientset *kubernetes.Clientset, statefulset *appsv
 // watchForStatefulSetPodReady inspects a Pod associated with a StatefulSet and
 // uses a channel to determine when it's ready
 // The channel will timeout if the Pod isn't ready by timeoutSeconds
-func watchForStatefulSetPodReady(clientset *kubernetes.Clientset, namespace string, statefulSetName string, podName string, timeoutSeconds int) error {
+func watchForStatefulSetPodReady(clientset *kubernetes.Clientset, namespace string, podName string, timeoutSeconds int) error {
 	podObjWatch, err := clientset.CoreV1().Pods(namespace).Watch(context.Background(), metav1.ListOptions{
 		FieldSelector: fmt.Sprintf(
 			"metadata.name=%s", podName),

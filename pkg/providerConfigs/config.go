@@ -4,7 +4,7 @@ Copyright (C) 2021-2023, Kubefirst
 This program is licensed under MIT.
 See the LICENSE file for more details.
 */
-package providerConfigs
+package providerConfigs //nolint:revive // allowing temporarily for better code organization
 
 import (
 	"fmt"
@@ -21,9 +21,9 @@ type ProviderConfig struct {
 	GoogleProject                    string
 	K3sServersPrivateIps             []string
 	K3sServersPublicIps              []string
-	K3sSshPrivateKey                 string
+	K3sSSHPrivateKey                 string
 	K3sServersArgs                   []string
-	K3sSshUser                       string
+	K3sSSHUser                       string
 	VultrToken                       string
 	CloudflareAPIToken               string
 	CloudflareOriginCaIssuerAPIToken string
@@ -32,10 +32,10 @@ type ProviderConfig struct {
 	GitlabToken string
 
 	ArgoWorkflowsDir                string
-	DestinationGitopsRepoHttpsURL   string
+	DestinationGitopsRepoHTTPSURL   string
 	DestinationGitopsRepoGitURL     string
 	DestinationGitopsRepoURL        string
-	DestinationMetaphorRepoHttpsURL string
+	DestinationMetaphorRepoHTTPSURL string
 	DestinationMetaphorRepoGitURL   string
 	DestinationMetaphorRepoURL      string
 	GitopsDir                       string
@@ -60,19 +60,18 @@ type ProviderConfig struct {
 
 // GetConfig - load default values from kubefirst installer
 func GetConfig(
-	clusterName string,
-	domainName string,
-	gitProvider string,
-	gitOwner string,
-	gitProtocol string,
-	cloudflareAPIToken string,
+	clusterName,
+	domainName,
+	gitProvider,
+	gitOwner,
+	gitProtocol,
+	cloudflareAPIToken,
 	cloudflareOriginCaIssuerAPIToken string,
-) *ProviderConfig {
-	config := ProviderConfig{}
-
+) (*ProviderConfig, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatal().Msgf("something went wrong getting home path: %s", err)
+		log.Fatal().Msgf("unable to get current user's home directory: %s", err)
+		return nil, fmt.Errorf("unable to get current user's home directory: %w", err)
 	}
 
 	// cGitHost describes which git host to use depending on gitProvider
@@ -84,27 +83,27 @@ func GetConfig(
 		cGitHost = GitlabHost
 	}
 
-	config.DestinationGitopsRepoURL = fmt.Sprintf("https://%s/%s/gitops.git", cGitHost, gitOwner)
-	config.DestinationGitopsRepoGitURL = fmt.Sprintf("git@%s:%s/gitops.git", cGitHost, gitOwner)
-	config.DestinationMetaphorRepoURL = fmt.Sprintf("https://%s/%s/metaphor.git", cGitHost, gitOwner)
-	config.DestinationMetaphorRepoGitURL = fmt.Sprintf("git@%s:%s/metaphor.git", cGitHost, gitOwner)
-	config.ArgoWorkflowsDir = fmt.Sprintf("%s/.k1/%s/argo-workflows", homeDir, clusterName)
-	config.GitopsDir = fmt.Sprintf("%s/.k1/%s/gitops", homeDir, clusterName)
-	config.GitProvider = gitProvider
-	config.GitProtocol = gitProtocol
-	config.CloudflareAPIToken = cloudflareAPIToken
-	config.CloudflareOriginCaIssuerAPIToken = cloudflareOriginCaIssuerAPIToken
-	config.Kubeconfig = fmt.Sprintf("%s/.k1/%s/kubeconfig", homeDir, clusterName)
-	config.K1Dir = fmt.Sprintf("%s/.k1/%s", homeDir, clusterName)
-	config.KubectlClient = fmt.Sprintf("%s/.k1/%s/tools/kubectl", homeDir, clusterName)
-	config.KubefirstConfig = fmt.Sprintf("%s/.k1/%s/%s", homeDir, clusterName, ".kubefirst")
-	config.LogsDir = fmt.Sprintf("%s/.k1/%s/logs", homeDir, clusterName)
-	config.MetaphorDir = fmt.Sprintf("%s/.k1/%s/metaphor", homeDir, clusterName)
-	config.RegistryAppName = "registry"
-	config.RegistryYaml = fmt.Sprintf("%s/.k1/%s/gitops/registry/%s/registry.yaml", homeDir, clusterName, clusterName)
-	config.SSLBackupDir = fmt.Sprintf("%s/.k1/%s/ssl/%s", homeDir, clusterName, domainName)
-	config.TerraformClient = fmt.Sprintf("%s/.k1/%s/tools/terraform", homeDir, clusterName)
-	config.ToolsDir = fmt.Sprintf("%s/.k1/%s/tools", homeDir, clusterName)
-
-	return &config
+	return &ProviderConfig{
+		DestinationGitopsRepoURL:         fmt.Sprintf("https://%s/%s/gitops.git", cGitHost, gitOwner),
+		DestinationGitopsRepoGitURL:      fmt.Sprintf("git@%s:%s/gitops.git", cGitHost, gitOwner),
+		DestinationMetaphorRepoURL:       fmt.Sprintf("https://%s/%s/metaphor.git", cGitHost, gitOwner),
+		DestinationMetaphorRepoGitURL:    fmt.Sprintf("git@%s:%s/metaphor.git", cGitHost, gitOwner),
+		ArgoWorkflowsDir:                 fmt.Sprintf("%s/.k1/%s/argo-workflows", homeDir, clusterName),
+		GitopsDir:                        fmt.Sprintf("%s/.k1/%s/gitops", homeDir, clusterName),
+		GitProvider:                      gitProvider,
+		GitProtocol:                      gitProtocol,
+		CloudflareAPIToken:               cloudflareAPIToken,
+		CloudflareOriginCaIssuerAPIToken: cloudflareOriginCaIssuerAPIToken,
+		Kubeconfig:                       fmt.Sprintf("%s/.k1/%s/kubeconfig", homeDir, clusterName),
+		K1Dir:                            fmt.Sprintf("%s/.k1/%s", homeDir, clusterName),
+		KubectlClient:                    fmt.Sprintf("%s/.k1/%s/tools/kubectl", homeDir, clusterName),
+		KubefirstConfig:                  fmt.Sprintf("%s/.k1/%s/%s", homeDir, clusterName, ".kubefirst"),
+		LogsDir:                          fmt.Sprintf("%s/.k1/%s/logs", homeDir, clusterName),
+		MetaphorDir:                      fmt.Sprintf("%s/.k1/%s/metaphor", homeDir, clusterName),
+		RegistryAppName:                  "registry",
+		RegistryYaml:                     fmt.Sprintf("%s/.k1/%s/gitops/registry/%s/registry.yaml", homeDir, clusterName, clusterName),
+		SSLBackupDir:                     fmt.Sprintf("%s/.k1/%s/ssl/%s", homeDir, clusterName, domainName),
+		TerraformClient:                  fmt.Sprintf("%s/.k1/%s/tools/terraform", homeDir, clusterName),
+		ToolsDir:                         fmt.Sprintf("%s/.k1/%s/tools", homeDir, clusterName),
+	}, nil
 }

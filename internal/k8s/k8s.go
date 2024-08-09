@@ -48,7 +48,6 @@ func UpdateSecretV2(clientset *kubernetes.Clientset, namespace string, secretNam
 		currentSecret,
 		metav1.UpdateOptions{},
 	)
-
 	if err != nil {
 		return err
 	}

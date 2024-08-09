@@ -18,15 +18,15 @@ import (
 )
 
 // GetRegionalObjectStorageClusters determines if a region has object storage clusters available
-func (c *VultrConfiguration) GetRegionalObjectStorageClusters() (int, error) {
+func (c *Configuration) GetRegionalObjectStorageClusters() (int, error) {
 	// Get cluster id of object storage cluster for region
 	clusters, _, _, err := c.Client.ObjectStorage.ListCluster(c.Context, &govultr.ListOptions{
 		Region: c.ObjectStorageRegion,
 	})
 	if err != nil {
-		return 0, fmt.Errorf("could not get object storage clusters: %s", err)
+		return 0, fmt.Errorf("could not get object storage clusters: %w", err)
 	}
-	var clid int = 0
+	clid := 0
 	for _, cluster := range clusters {
 		if cluster.Region == c.ObjectStorageRegion {
 			clid = cluster.ID
@@ -40,7 +40,7 @@ func (c *VultrConfiguration) GetRegionalObjectStorageClusters() (int, error) {
 }
 
 // CreateObjectStorage creates a Vultr object storage resource
-func (c *VultrConfiguration) CreateObjectStorage(storeName string) (govultr.ObjectStorage, error) {
+func (c *Configuration) CreateObjectStorage(storeName string) (govultr.ObjectStorage, error) {
 	// Get cluster id of object storage cluster for region
 	clid, err := c.GetRegionalObjectStorageClusters()
 	if err != nil {
@@ -72,14 +72,14 @@ func (c *VultrConfiguration) CreateObjectStorage(storeName string) (govultr.Obje
 }
 
 // DeleteObjectStorage deletes a Vultr object storage resource
-func (c *VultrConfiguration) DeleteObjectStorage(storeName string) error {
+func (c *Configuration) DeleteObjectStorage(storeName string) error {
 	// Get object storage id
 	res, _, _, err := c.Client.ObjectStorage.List(c.Context, &govultr.ListOptions{
 		Label:  storeName,
 		Region: c.ObjectStorageRegion,
 	})
 	if err != nil {
-		return fmt.Errorf("error listing object storage: %s", err)
+		return fmt.Errorf("error listing object storage: %w", err)
 	}
 
 	if len(res) == 0 {
@@ -88,14 +88,14 @@ func (c *VultrConfiguration) DeleteObjectStorage(storeName string) error {
 
 	err = c.Client.ObjectStorage.Delete(c.Context, res[0].ID)
 	if err != nil {
-		return fmt.Errorf("error deleting object storage: %s", err)
+		return fmt.Errorf("error deleting object storage: %w", err)
 	}
 
 	return nil
 }
 
 // GetObjectStorage retrieves all Vultr object storage resources
-func (c *VultrConfiguration) GetObjectStorage() ([]govultr.ObjectStorage, error) {
+func (c *Configuration) GetObjectStorage() ([]govultr.ObjectStorage, error) {
 	objst, _, _, err := c.Client.ObjectStorage.List(c.Context, &govultr.ListOptions{
 		Region: c.ObjectStorageRegion,
 	})
@@ -107,7 +107,7 @@ func (c *VultrConfiguration) GetObjectStorage() ([]govultr.ObjectStorage, error)
 }
 
 // CreateObjectStorageBucket leverages minio to create a bucket within Vultr object storage
-func (c *VultrConfiguration) CreateObjectStorageBucket(cr VultrBucketCredentials, bucketName string) error {
+func (c *Configuration) CreateObjectStorageBucket(cr BucketCredentials, bucketName string) error {
 	ctx := context.Background()
 	useSSL := true
 
@@ -117,7 +117,7 @@ func (c *VultrConfiguration) CreateObjectStorageBucket(cr VultrBucketCredentials
 		Secure: useSSL,
 	})
 	if err != nil {
-		return fmt.Errorf("error initializing minio client for vultr: %s", err)
+		return fmt.Errorf("error initializing minio client for vultr: %w", err)
 	}
 
 	location := "us-east-1"

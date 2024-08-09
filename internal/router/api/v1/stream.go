@@ -7,10 +7,10 @@ See the LICENSE file for more details.
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -38,11 +38,6 @@ func setHeaders(c *gin.Context) {
 func GetLogs(c *gin.Context) {
 	setHeaders(c)
 
-	var (
-		mu     sync.Mutex
-		buffer string
-	)
-
 	fileName, param := c.Params.Get("file_name")
 
 	if !param {
@@ -54,47 +49,46 @@ func GetLogs(c *gin.Context) {
 
 	// Stream logs
 	logs := make(chan types.LogMessage)
-	done := make(chan struct{})
 	errCh := make(chan error)
 	go func() {
-		err := StreamLogs(fileName, logs, errCh, done, mu, buffer)
+		err := StreamLogs(c.Request.Context(), fileName, logs)
 		if err != nil {
 			errCh <- err
 		}
 	}()
 
 	// Stream logs to client using SSE
-	streamLogsToClient(c, logs, errCh, done)
+	streamLogsToClient(c, logs, errCh)
 }
 
 // StreamLogs redirects stdout logs to the stream via SSE
-func StreamLogs(fileName string, ch chan types.LogMessage, errCh chan error, done chan struct{}, mu sync.Mutex, buffer string) error {
+func StreamLogs(ctx context.Context, fileName string, ch chan types.LogMessage) error {
 	homePath, err := os.UserHomeDir()
 	if err != nil {
-		log.Info().Msg(err.Error())
+		log.Info().Msgf("error getting user home directory: %s", err.Error())
+		return fmt.Errorf("error getting user home directory: %w", err)
 	}
+
 	k1Dir := fmt.Sprintf("%s/.k1", homePath)
-
-	//* create log directory
 	logsFolder := fmt.Sprintf("%s/logs", k1Dir)
-
 	logfile := fmt.Sprintf("%s/%s", logsFolder, fileName)
 
 	t, err := tail.TailFile(logfile, tail.Config{Follow: true, ReOpen: true})
 	if err != nil {
-		return fmt.Errorf("error opening log file %s", err.Error())
+		return fmt.Errorf("error opening log file %w", err)
 	}
 
 	// Continuously stream log lines to the client
 	for {
 		select {
+		case <-ctx.Done():
+			t.Cleanup()
+			return nil
+
 		case line, ok := <-t.Lines:
 			if !ok {
-				return err
+				return nil
 			}
-			mu.Lock()
-			buffer = line.Text
-			mu.Unlock()
 
 			// Send the log line to the client as an event
 			ch <- types.LogMessage{
@@ -108,7 +102,7 @@ func StreamLogs(fileName string, ch chan types.LogMessage, errCh chan error, don
 }
 
 // streamLogsToClient
-func streamLogsToClient(c *gin.Context, logs chan types.LogMessage, errCh chan error, done chan struct{}) {
+func streamLogsToClient(c *gin.Context, logs chan types.LogMessage, errCh chan error) {
 	for {
 		select {
 		// received new log line in go channel
@@ -116,11 +110,11 @@ func streamLogsToClient(c *gin.Context, logs chan types.LogMessage, errCh chan e
 			c.SSEvent(log.Type, log)
 			c.Writer.Flush()
 		case err := <-errCh:
+			log.Error().Msgf("error reading logs: %s", err.Error())
 			c.SSEvent("error", err.Error())
 			return
 			// channel should be closed
 		case <-c.Writer.CloseNotify():
-			close(done)
 			return
 		}
 	}

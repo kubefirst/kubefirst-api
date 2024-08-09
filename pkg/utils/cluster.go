@@ -3,7 +3,6 @@ package pkg
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,9 +11,8 @@ import (
 	"time"
 
 	pkg "github.com/kubefirst/kubefirst-api/internal"
-	"github.com/kubefirst/kubefirst-api/internal/k8s"
+	"github.com/kubefirst/kubefirst-api/internal/httpCommon"
 	"github.com/kubefirst/kubefirst-api/pkg/types"
-
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/zerolog/log"
@@ -30,19 +28,19 @@ func PutClusterObject(cr *types.StateStoreCredentials, d *types.StateStoreDetail
 		Secure: true,
 	})
 	if err != nil {
-		return fmt.Errorf("error initializing minio client: %s", err)
+		return fmt.Errorf("error initializing minio client: %w", err)
 	}
 
 	// Reference for cluster object output file
 	object, err := os.Open(obj.LocalFilePath)
 	if err != nil {
-		return fmt.Errorf("error during object local copy file lookup: %s", err)
+		return fmt.Errorf("error during object local copy file lookup for %q: %w", obj.LocalFilePath, err)
 	}
 	defer object.Close()
 
 	objectStat, err := object.Stat()
 	if err != nil {
-		return fmt.Errorf("error during object stat: %s", err)
+		return fmt.Errorf("error during object stat for %q: %w", obj.LocalFilePath, err)
 	}
 
 	// Put
@@ -55,66 +53,64 @@ func PutClusterObject(cr *types.StateStoreCredentials, d *types.StateStoreDetail
 		minio.PutObjectOptions{ContentType: obj.ContentType},
 	)
 	if err != nil {
-		return fmt.Errorf("error during object put: %s", err)
+		return fmt.Errorf("error during object put: %w", err)
 	}
 	log.Info().Msgf("uploaded cluster object %s to state store bucket %s successfully", obj.LocalFilePath, d.Name)
 
-	err = os.Remove(obj.LocalFilePath)
-	if err != nil {
-		return err
+	if err := os.Remove(obj.LocalFilePath); err != nil {
+		return fmt.Errorf("error during object local copy file removal %q: %w", obj.LocalFilePath, err)
 	}
 
 	return nil
 }
 
 // ExportCluster proxy to kubefirst api /cluster/import to restore the database
-func ExportCluster(kcfg k8s.KubernetesClient, cl types.Cluster) error {
+func ExportCluster(cl types.Cluster) error {
 	time.Sleep(time.Second * 10)
 
 	err := pkg.IsAppAvailable(fmt.Sprintf("%s/api/proxyHealth", pkg.KubefirstConsoleLocalURLCloud), "kubefirst api")
 	if err != nil {
 		log.Error().Err(err).Msg("unable to start kubefirst api")
+		return fmt.Errorf("unable to start kubefirst api: %w", err)
 	}
 
 	requestObject := types.ProxyImportRequest{
 		Body: cl,
-		Url:  "/cluster/import",
+		URL:  "/cluster/import",
 	}
-
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	httpClient := http.Client{Transport: customTransport}
 
 	payload, err := json.Marshal(requestObject)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshalling request object: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/proxy", pkg.KubefirstConsoleLocalURLCloud), bytes.NewReader(payload))
+	url := fmt.Sprintf("%s/api/proxy", pkg.KubefirstConsoleLocalURLCloud)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		log.Info().Msgf("error %s", err)
-		return err
+		return fmt.Errorf("error creating request to %q: %w", url, err)
 	}
+
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
 
-	res, err := httpClient.Do(req)
+	res, err := httpCommon.CustomHTTPClient(true).Do(req)
 	if err != nil {
 		log.Info().Msgf("error %s", err)
-		return err
+		return fmt.Errorf("error sending request to %q: %w", url, err)
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		log.Info().Msgf("unable to import cluster %s", res.Status)
-		return err
+		log.Info().Msgf("unable to export cluster %s", res.Status)
+		return fmt.Errorf("unable to export cluster: status code was not 200 ok: %s", res.Status)
 	}
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("error reading response body: %w", err)
 	}
 
 	log.Info().Msgf("Import: %s", string(body))
-
 	return nil
 }

@@ -42,7 +42,7 @@ var (
 	VaultURL               = fmt.Sprintf("https://vault.%s", DomainName)
 )
 
-type K3dConfig struct {
+type Config struct {
 	GithubToken string
 	GitlabToken string
 
@@ -50,8 +50,8 @@ type K3dConfig struct {
 	DestinationGitopsRepoURL        string
 	DestinationMetaphorRepoURL      string
 	DestinationMetaphorRepoGitURL   string
-	DestinationGitopsRepoHttpsURL   string
-	DestinationMetaphorRepoHttpsURL string
+	DestinationGitopsRepoHTTPSURL   string
+	DestinationMetaphorRepoHTTPSURL string
 	GitopsDir                       string
 	GitProvider                     string
 	GitProtocol                     string
@@ -69,8 +69,8 @@ type K3dConfig struct {
 }
 
 // GetConfig - load default values from kubefirst installer
-func GetConfig(clusterName string, gitProvider string, gitOwner string, gitProtocol string) *K3dConfig {
-	config := K3dConfig{}
+func GetConfig(clusterName string, gitProvider string, gitOwner string, gitProtocol string) *Config {
+	config := Config{}
 
 	if err := env.Parse(&config); err != nil {
 		log.Error().Msgf("something went wrong loading the environment variables: %s", err)
@@ -120,7 +120,7 @@ type GitopsDirectoryValues struct {
 	GitlabOwnerGroupID            int
 	GitlabUser                    string
 	GitopsRepoGitURL              string
-	GitopsRepoHttpsURL            string
+	GitopsRepoHTTPSURL            string
 	DomainName                    string
 	AtlantisAllowList             string
 	AlertsEmail                   string
@@ -141,7 +141,7 @@ type GitopsDirectoryValues struct {
 	UseTelemetry                  string
 	GitProvider                   string
 	CloudProvider                 string
-	ClusterId                     string
+	ClusterID                     string
 	KubeconfigPath                string
 }
 

@@ -119,7 +119,6 @@ func printLetsEncryptCertData(messageHeader string, params []CertificateDetail, 
 	}
 
 	return certificateData.String()
-
 }
 
 // removeDuplicates takes []CertificateDetail and removes duplicate entries

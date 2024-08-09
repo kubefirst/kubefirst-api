@@ -35,7 +35,7 @@ type PortForwardAPodRequest struct {
 	PodPort int
 
 	//// Steams configures where to write or read input from
-	//Streams genericclioptions.IOStreams
+	// Streams genericclioptions.IOStreams
 
 	// StopCh is the channel used to manage the port forward lifecycle
 	StopCh <-chan struct{}
@@ -54,7 +54,7 @@ type PortForwardAServiceRequest struct {
 	ServicePort int
 
 	//// Steams configures where to write or read input from
-	//Streams genericclioptions.IOStreams
+	// Streams genericclioptions.IOStreams
 
 	// StopCh is the channel used to manage the port forward lifecycle
 	StopCh <-chan struct{}
@@ -72,8 +72,7 @@ func PortForwardPodWithRetry(clientset *kubernetes.Clientset, req PortForwardAPo
 		time.Sleep(20 * time.Second)
 	}
 
-	return fmt.Errorf("not able to open port-forward: %s", err)
-
+	return fmt.Errorf("not able to open port-forward: %w", err)
 }
 
 // PortForwardPod receives a PortForwardAPodRequest, and enables port forwarding for the specified resource.
@@ -89,7 +88,7 @@ func PortForwardPod(clientset *kubernetes.Clientset, req PortForwardAPodRequest)
 	for _, pod := range podList.Items {
 		// pick the first pod found to be running
 		if pod.Status.Phase == v1.PodRunning && strings.HasPrefix(pod.Name, req.Pod.Name) {
-			runningPod = &pod
+			runningPod = pod.DeepCopy()
 			break
 		}
 	}
@@ -103,7 +102,7 @@ func PortForwardPod(clientset *kubernetes.Clientset, req PortForwardAPodRequest)
 	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", runningPod.Namespace, runningPod.Name)
 	hostURL, err := url.Parse(req.RestConfig.Host)
 	if err != nil {
-		return fmt.Errorf("could not parse kubernetes host url: %s", err)
+		return fmt.Errorf("could not parse kubernetes host url: %w", err)
 	}
 
 	if hostURL.Host == "" {

@@ -7,7 +7,7 @@ See the LICENSE file for more details.
 package wrappers
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/kubefirst/kubefirst-api/pkg/handlers"
 )
@@ -25,7 +25,7 @@ func AuthenticateGitHubUserWrapper(gitHubAccessToken string, gitHubHandler *hand
 	}
 
 	if gitHubAccessToken == "" {
-		return "", fmt.Errorf("unable to retrieve a GitHub token for the user")
+		return "", errors.New("unable to retrieve a GitHub token for the user")
 	}
 
 	return gitHubAccessToken, nil

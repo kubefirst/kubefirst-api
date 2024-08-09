@@ -17,15 +17,17 @@ type ActionTracker struct {
 	Tracker *progress.Tracker
 }
 
-const DownloadDependencies = "Download dependencies"
-const GetAccountInfo = "Get Account Info"
-const GetDNSInfo = "Get DNS Info"
-const TestHostedZoneLiveness = "Test Domain Liveness"
-const CloneAndDetokenizeGitopsTemplate = "Clone and Detokenize (Gitops)"
-const CloneAndDetokenizeMetaphorTemplate = "Clone and Detokenize (Metaphor)"
-const CreateSSHKey = "Create SSH keys"
-const CreateBuckets = "Create Buckets"
-const SendTelemetry = "Send Telemetry"
+const (
+	DownloadDependencies               = "Download dependencies"
+	GetAccountInfo                     = "Get Account Info"
+	GetDNSInfo                         = "Get DNS Info"
+	TestHostedZoneLiveness             = "Test Domain Liveness"
+	CloneAndDetokenizeGitopsTemplate   = "Clone and Detokenize (Gitops)"
+	CloneAndDetokenizeMetaphorTemplate = "Clone and Detokenize (Metaphor)"
+	CreateSSHKey                       = "Create SSH keys"
+	CreateBuckets                      = "Create Buckets"
+	SendTelemetry                      = "Send Telemetry"
+)
 
 var (
 	pw       progress.Writer
@@ -43,7 +45,6 @@ func GetTrackers() map[string]*ActionTracker {
 
 // CreateTracker receives Tracker data and return a new Tracker.
 func CreateTracker(title string, total int64) *progress.Tracker {
-
 	tracker := &progress.Tracker{
 		Message: title,
 		Total:   total,
@@ -57,7 +58,6 @@ func CreateTracker(title string, total int64) *progress.Tracker {
 
 // SetupProgress prepare the progress bar setting its initial configuration
 func SetupProgress(numTrackers int) {
-
 	fmt.Printf("Init actions: %d expected tasks ...\n\n", numTrackers)
 	// instantiate a Progress Writer and set up the options
 	pw = progress.NewWriter()

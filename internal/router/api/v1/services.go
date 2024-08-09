@@ -272,7 +272,7 @@ func PostValidateService(c *gin.Context) {
 		return
 	}
 
-	err, canDeleteService := services.ValidateService(&cl, serviceName, &serviceDefinition)
+	canDeleteService, err := services.ValidateService(&cl, serviceName, &serviceDefinition)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, types.JSONFailureResponse{
 			Message: err.Error(),

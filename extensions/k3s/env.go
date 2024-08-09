@@ -30,7 +30,7 @@ func readVaultTokenFromSecret(clientset *kubernetes.Clientset) string {
 }
 
 func GetK3sTerraformEnvs(envs map[string]string, cl *pkgtypes.Cluster) map[string]string {
-	envs["TF_VAR_ssh_private_key"] = cl.K3sAuth.K3sSshPrivateKey
+	envs["TF_VAR_ssh_private_key"] = cl.K3sAuth.K3sSSHPrivateKey
 	envs["AWS_ACCESS_KEY_ID"] = cl.StateStoreCredentials.AccessKeyID
 	envs["AWS_SECRET_ACCESS_KEY"] = cl.StateStoreCredentials.SecretAccessKey
 	envs["AWS_SESSION_TOKEN"] = "" // allows for debugging
@@ -110,9 +110,8 @@ func GetVaultTerraformEnvs(clientset *kubernetes.Clientset, cl *pkgtypes.Cluster
 	envs["AWS_SESSION_TOKEN"] = ""        // allows for debugging
 	envs["TF_VAR_aws_session_token"] = "" // allows for debugging
 
-	switch cl.GitProvider {
-	case "gitlab":
-		envs["TF_VAR_owner_group_id"] = fmt.Sprint(cl.GitlabOwnerGroupID)
+	if cl.GitProvider == "gitlab" {
+		envs["TF_VAR_owner_group_id"] = fmt.Sprintf("%d", cl.GitlabOwnerGroupID)
 	}
 
 	return envs

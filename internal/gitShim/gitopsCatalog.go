@@ -4,11 +4,11 @@ Copyright (C) 2021-2023, Kubefirst
 This program is licensed under MIT.
 See the LICENSE file for more details.
 */
-package gitShim
+package gitShim //nolint:revive // allowed during code reorg
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 
 	"github.com/google/go-github/v52/github"
@@ -70,20 +70,16 @@ func (gh *GitHubClient) ReadGitopsCatalogRepoDirectory(path string) ([]*github.R
 // ReadGitopsCatalogIndex reads the gitops catalog repository index
 func (gh *GitHubClient) ReadGitopsCatalogIndex(contents []*github.RepositoryContent) ([]byte, error) {
 	for _, content := range contents {
-		switch *content.Type {
-		case "file":
-			switch *content.Name {
-			case "index.yaml":
-				b, err := gh.readFileContents(content)
-				if err != nil {
-					return b, err
-				}
-				return b, nil
+		if *content.Type == "file" && *content.Name == "index.yaml" {
+			b, err := gh.readFileContents(content)
+			if err != nil {
+				return b, err
 			}
+			return b, nil
 		}
 	}
 
-	return []byte{}, fmt.Errorf("index.yaml not found in gitops catalog repository")
+	return []byte{}, errors.New("index.yaml not found in gitops catalog repository")
 }
 
 // ReadGitopsCatalogAppDirectory reads the file content in a gitops catalog app directory
@@ -106,9 +102,9 @@ func (gh *GitHubClient) ReadGitopsCatalogAppDirectory(contents []*github.Reposit
 			}
 
 			return res, nil
-		} else {
-			continue
 		}
+
+		continue
 	}
 
 	return [][]byte{}, nil
