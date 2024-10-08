@@ -36,4 +36,9 @@ jobs:
             -p containerRegistryURL="ghcr.io/konstructio/${GITHUB_REPOSITORY_NAME_PART}:${GITHUB_SHA_SHORT}" \
             -p gitUrlNoProtocol="git@github.com:${GITHUB_REPOSITORY_OWNER_PART_SLUG}" \
             -p shortSha="${GITHUB_SHA_SHORT}" \
+            -p ghRepo="${GITHUB_REPOSITORY_NAME_PART}" \
+            -p ghUser="konstruct-bot" \
+            -p ghToken=${{ secrets.GITHUB_TOKEN }} \
+            -p ghOrg="${GITHUB_REPOSITORY_OWNER_PART_SLUG}" \
+            -p ociRegistry="ghcr.io" \
             --wait --log

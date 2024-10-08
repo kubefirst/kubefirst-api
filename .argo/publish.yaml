@@ -86,6 +86,31 @@ spec:
                   value: "{{workflow.parameters.appName}}"
                 - name: chartDir
                   value: "charts/{{workflow.parameters.appName}}"
+        
+        - - name: publish-oci-micro-helm-chart
+            templateRef:
+              name: cwft-helm-v2
+              template: publish-chart-oci-registry
+              clusterScope: true
+            arguments:
+              artifacts:
+                - name: repo-source
+                  from: "{{steps.set-micro-chart-versions.outputs.artifacts.repo-source}}"
+              parameters:
+                - name: appName
+                  value: "{{workflow.parameters.appName}}"
+                - name: chartDir
+                  value: "charts/{{workflow.parameters.appName}}"
+                - name: ghRepo
+                  value: "{{workflow.parameters.ghRepo}}"
+                - name: ghUser
+                  value: "{{workflow.parameters.ghUser}}"
+                - name: ghToken
+                  value: "{{workflow.parameters.ghToken}}"
+                - name: ghOrg
+                  value: "{{workflow.parameters.ghOrg}}"  
+                - name: ociRegistry
+                  default: "ghcr.io"
 
         - - name: set-micro-version-and-bump-macro-chart
             templateRef:
@@ -144,6 +169,31 @@ spec:
               parameters:
                 - name: chartDir
                   value: "charts/kubefirst"
+
+        - - name: publish-oci-macro-helm-chart
+            templateRef:
+              name: cwft-helm-v2
+              template: publish-chart-oci-registry
+              clusterScope: true
+            arguments:
+              artifacts:
+                - name: repo-source
+                  from: "{{steps.helm-dependency-update-macro.outputs.artifacts.repo-source}}"
+              parameters:
+                - name: appName
+                  value: "charts"
+                - name: chartDir
+                  value: "charts/kubefirst"
+                - name: ghRepo
+                  value: "{{workflow.parameters.ghRepo}}"
+                - name: ghUser
+                  value: "{{workflow.parameters.ghUser}}"
+                - name: ghToken
+                  value: "{{workflow.parameters.ghToken}}"
+                - name: ghOrg
+                  value: "{{workflow.parameters.ghOrg}}"  
+                - name: ociRegistry
+                  default: "ghcr.io"
 
         - - name: pull-commit-sign-push-signed-tag-charts
             templateRef:
