@@ -21,6 +21,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var gpuSupport = []string{"civo"}
+
 const (
 	AkamaiGitHub       = "akamai-github"
 	AwsGitHub          = "aws-github"
@@ -143,6 +145,21 @@ func AdjustGitopsRepo(
 		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/40-cloudflare-origin-issuer-crd.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
 		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/41-cloudflare-origin-ca-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
 		removeAllWithLogger(strings.ToLower(fmt.Sprintf("%s/%s-%s/templates/workload-vcluster/45-cloudflare-origin-issuer.yaml", gitopsRepoDir, cloudProvider, gitProvider)))
+
+		for _, cloudProvider := range gpuSupport {
+			basePath := filepath.Join(gitopsRepoDir, fmt.Sprintf("%s-%s", cloudProvider, gitProvider), "templates", "gpu-cluster")
+			lowerPath := strings.ToLower(basePath)
+
+			for _, cloud := range gpuSupport {
+				if cloud == cloudProvider {
+					removeAllWithLogger(filepath.Join(lowerPath, "cloudflare-origin-issuer"))
+					removeAllWithLogger(filepath.Join(lowerPath, "40-cloudflare-origin-issuer-crd.yaml"))
+					removeAllWithLogger(filepath.Join(lowerPath, "41-cloudflare-origin-ca-issuer.yaml"))
+					removeAllWithLogger(filepath.Join(lowerPath, "45-cloudflare-origin-issuer.yaml"))
+					break
+				}
+			}
+		}
 	}
 
 	cloudAndGitProvider := strings.ToLower(fmt.Sprintf("%s-%s", cloudProvider, gitProvider))
